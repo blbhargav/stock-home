@@ -7,7 +7,12 @@ import '../providers/auth_provider.dart';
 /// Lets a signed-in user create a new household or join an existing one
 /// using a shared household code. Wired to [AuthProvider].
 class HouseholdSetupScreen extends StatefulWidget {
-  const HouseholdSetupScreen({super.key});
+  const HouseholdSetupScreen({super.key, this.addingAnother = false});
+
+  /// When true, this screen is pushed as a route to add a second household
+  /// (shows a back button and pops on success). When false, it's the gate
+  /// screen for first-time setup.
+  final bool addingAnother;
 
   @override
   State<HouseholdSetupScreen> createState() => _HouseholdSetupScreenState();
@@ -56,8 +61,12 @@ class _HouseholdSetupScreenState extends State<HouseholdSetupScreen> {
     setState(() => _creating = true);
     try {
       await context.read<AuthProvider>().createHousehold(_nameCtrl.text);
-      // AppGate routes to HomeScreen once householdId is set.
-    } catch (_) {
+      if (widget.addingAnother && mounted) {
+        _showSnack('Household created! Switched to "${_nameCtrl.text}".');
+        Navigator.of(context).pop();
+      }
+      // Otherwise AppGate routes to HomeScreen once householdId is set.
+    } catch (e) {
       if (mounted) {
         _showSnack('Could not create household. Please try again.');
       }
@@ -74,7 +83,11 @@ class _HouseholdSetupScreenState extends State<HouseholdSetupScreen> {
     setState(() => _joining = true);
     try {
       await context.read<AuthProvider>().joinHousehold(_codeCtrl.text);
-      // AppGate routes to HomeScreen once householdId is set.
+      if (widget.addingAnother && mounted) {
+        _showSnack('Joined household!');
+        Navigator.of(context).pop();
+      }
+      // Otherwise AppGate routes to HomeScreen once householdId is set.
     } catch (e) {
       if (mounted) {
         setState(() => _joinError = e is StateError
@@ -125,7 +138,7 @@ class _HouseholdSetupScreenState extends State<HouseholdSetupScreen> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final auth = context.watch<AuthProvider>();
-    final name = auth.user?.displayName?.trim();
+    final name = auth.resolvedDisplayName;
 
     return Scaffold(
       appBar: AppBar(

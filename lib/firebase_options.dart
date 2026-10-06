@@ -45,45 +45,46 @@ class DefaultFirebaseOptions {
   // ---------------------------------------------------------------------------
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'REPLACE_ME',
-    appId: 'REPLACE_ME',
-    messagingSenderId: 'REPLACE_ME',
-    projectId: 'REPLACE_ME',
-    authDomain: 'REPLACE_ME',
-    storageBucket: 'REPLACE_ME',
+    apiKey: 'AIzaSyDel-avXb9wG7OtE4-ECtKweqzQy7OrUng',
+    appId: '1:964520258094:web:62c9726a4c440b0324cdbf',
+    messagingSenderId: '964520258094',
+    projectId: 'stock-home-pantry',
+    authDomain: 'stock-home-pantry.firebaseapp.com',
+    storageBucket: 'stock-home-pantry.firebasestorage.app',
+    measurementId: 'G-S46L1G9Y0Q',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'REPLACE_ME',
-    appId: 'REPLACE_ME',
-    messagingSenderId: 'REPLACE_ME',
-    projectId: 'REPLACE_ME',
-    storageBucket: 'REPLACE_ME',
+    apiKey: 'AIzaSyDZnFLHkPmHfX1Vm6Gx8_djsoNWNqinuhk',
+    appId: '1:964520258094:android:3ab277a5f0f2b5d224cdbf',
+    messagingSenderId: '964520258094',
+    projectId: 'stock-home-pantry',
+    storageBucket: 'stock-home-pantry.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'REPLACE_ME',
-    appId: 'REPLACE_ME',
-    messagingSenderId: 'REPLACE_ME',
-    projectId: 'REPLACE_ME',
-    storageBucket: 'REPLACE_ME',
-    iosBundleId: 'com.pantrypal.pantrypal',
+    apiKey: 'AIzaSyBmfEj3QaVQhnhpHomNm7JzIYUyd_89xbI',
+    appId: '1:964520258094:ios:c3ddce7ec80cf65824cdbf',
+    messagingSenderId: '964520258094',
+    projectId: 'stock-home-pantry',
+    storageBucket: 'stock-home-pantry.firebasestorage.app',
+    iosBundleId: 'com.blb.stockhome',
   );
-
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'REPLACE_ME',
-    appId: 'REPLACE_ME',
-    messagingSenderId: 'REPLACE_ME',
-    projectId: 'REPLACE_ME',
-    storageBucket: 'REPLACE_ME',
-    iosBundleId: 'com.pantrypal.pantrypal',
+    apiKey: 'AIzaSyBmfEj3QaVQhnhpHomNm7JzIYUyd_89xbI',
+    appId: '1:964520258094:ios:61353e3288dfe66324cdbf',
+    messagingSenderId: '964520258094',
+    projectId: 'stock-home-pantry',
+    storageBucket: 'stock-home-pantry.firebasestorage.app',
+    iosBundleId: 'com.blb.stockhome',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'REPLACE_ME',
-    appId: 'REPLACE_ME',
-    messagingSenderId: 'REPLACE_ME',
-    projectId: 'REPLACE_ME',
-    storageBucket: 'REPLACE_ME',
+    apiKey: 'AIzaSyDel-avXb9wG7OtE4-ECtKweqzQy7OrUng',
+    appId: '1:964520258094:web:17f2fbb4a86f9bab24cdbf',
+    messagingSenderId: '964520258094',
+    projectId: 'stock-home-pantry',
+    authDomain: 'stock-home-pantry.firebaseapp.com',
+    storageBucket: 'stock-home-pantry.firebasestorage.app',
+    measurementId: 'G-DW2GHX2PLL',
   );
 }

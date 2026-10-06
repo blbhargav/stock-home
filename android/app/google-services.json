@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "964520258094",
+    "project_id": "stock-home-pantry",
+    "storage_bucket": "stock-home-pantry.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:964520258094:android:3ab277a5f0f2b5d224cdbf",
+        "android_client_info": {
+          "package_name": "com.blb.stockhome"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDZnFLHkPmHfX1Vm6Gx8_djsoNWNqinuhk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:964520258094:android:1ca0d8a12a474f8f24cdbf",
+        "android_client_info": {
+          "package_name": "com.pantrypal.pantrypal"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDZnFLHkPmHfX1Vm6Gx8_djsoNWNqinuhk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

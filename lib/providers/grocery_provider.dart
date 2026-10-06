@@ -3,8 +3,11 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../models/grocery_item.dart';
+import '../models/purchase_record.dart';
+import '../services/export_service.dart';
 import '../services/grocery_service.dart';
 import '../services/notification_service.dart';
+import '../services/purchase_service.dart';
 import '../services/settings_service.dart';
 
 /// Filter options for the grocery list.
@@ -28,15 +31,54 @@ extension GrocerySortX on GrocerySort {
   }
 }
 
+/// Sort options for the shopping list.
+enum ShoppingSort { name, category, recentlyAdded }
+
+extension ShoppingSortX on ShoppingSort {
+  String get label {
+    switch (this) {
+      case ShoppingSort.name:
+        return 'Name';
+      case ShoppingSort.category:
+        return 'Category';
+      case ShoppingSort.recentlyAdded:
+        return 'Recently added';
+    }
+  }
+}
+
+/// A predicted "running low" item based on purchase regularity.
+class LowStockSuggestion {
+  const LowStockSuggestion({
+    required this.name,
+    required this.avgIntervalDays,
+    required this.daysSinceLast,
+    required this.overdueBy,
+  });
+
+  final String name;
+  final int avgIntervalDays;
+  final int daysSinceLast;
+  final int overdueBy;
+
+  /// A short human explanation, e.g. "Usually every 7 days · last bought 10d ago".
+  String get reason {
+    final every = avgIntervalDays == 1 ? 'day' : '$avgIntervalDays days';
+    return 'Usually every $every · last bought ${daysSinceLast}d ago';
+  }
+}
+
 /// Streams and mutates the grocery list for the active household.
 class GroceryProvider extends ChangeNotifier {
   GroceryProvider({
     GroceryService? service,
     NotificationService? notifications,
     SettingsService? settings,
+    PurchaseService? purchases,
   })  : _service = service ?? GroceryService(),
         _notifications = notifications ?? NotificationService.instance,
-        _settings = settings ?? SettingsService() {
+        _settings = settings ?? SettingsService(),
+        _purchases = purchases ?? PurchaseService() {
     _loadPreferences();
   }
 
@@ -44,9 +86,12 @@ class GroceryProvider extends ChangeNotifier {
     try {
       final sortIndex = await _settings.getSortIndex();
       final group = await _settings.getGroupByCategory();
+      final shoppingSortIndex = await _settings.getShoppingSortIndex();
       _sort = GrocerySort.values[
           sortIndex.clamp(0, GrocerySort.values.length - 1)];
       _groupByCategory = group;
+      _shoppingSort = ShoppingSort.values[
+          shoppingSortIndex.clamp(0, ShoppingSort.values.length - 1)];
       notifyListeners();
     } catch (_) {
       // Ignore; defaults are fine.
@@ -56,6 +101,7 @@ class GroceryProvider extends ChangeNotifier {
   final GroceryService _service;
   final NotificationService _notifications;
   final SettingsService _settings;
+  final PurchaseService _purchases;
 
   String? _householdId;
   StreamSubscription<GrocerySnapshot>? _sub;
@@ -67,9 +113,24 @@ class GroceryProvider extends ChangeNotifier {
   GroceryFilter _filter = GroceryFilter.all;
   GrocerySort _sort = GrocerySort.name;
   bool _groupByCategory = false;
+  ShoppingSort _shoppingSort = ShoppingSort.name;
   String _search = '';
 
   List<GroceryItem> get allItems => List.unmodifiable(_items);
+
+  /// Returns distinct, non-empty notes from all current items, ordered by
+  /// frequency (most used first). Useful for note suggestions.
+  List<String> get recentNotes {
+    final counts = <String, int>{};
+    for (final item in _items) {
+      final note = item.notes?.trim();
+      if (note == null || note.isEmpty) continue;
+      counts[note] = (counts[note] ?? 0) + 1;
+    }
+    final sorted = counts.keys.toList()
+      ..sort((a, b) => counts[b]!.compareTo(counts[a]!));
+    return sorted;
+  }
   bool get loading => _loading;
 
   /// True when data is being served from the local cache (offline).
@@ -80,6 +141,7 @@ class GroceryProvider extends ChangeNotifier {
 
   GroceryFilter get filter => _filter;
   GrocerySort get sort => _sort;
+  ShoppingSort get shoppingSort => _shoppingSort;
   bool get groupByCategory => _groupByCategory;
   String get search => _search;
 
@@ -179,12 +241,57 @@ class GroceryProvider extends ChangeNotifier {
   }
 
   /// Items on the shopping list: still needed, or purchased-but-in-cart.
-  /// Purchased items stay visible (in the cart) until someone restocks them.
-  List<GroceryItem> get shoppingList => _items
-      .where((i) =>
-          i.status == GroceryStatus.needsPurchase ||
-          i.status == GroceryStatus.purchased)
-      .toList(growable: false);
+  /// Purchased items stay visible (in the cart) until someone restocks them,
+  /// sorted by the active shopping sort.
+  List<GroceryItem> get shoppingList {
+    final list = _items
+        .where((i) =>
+            i.status == GroceryStatus.needsPurchase ||
+            i.status == GroceryStatus.purchased)
+        .toList();
+    switch (_shoppingSort) {
+      case ShoppingSort.name:
+        list.sort((a, b) =>
+            a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        break;
+      case ShoppingSort.category:
+        list.sort((a, b) {
+          final c = a.category.compareTo(b.category);
+          return c != 0
+              ? c
+              : a.name.toLowerCase().compareTo(b.name.toLowerCase());
+        });
+        break;
+      case ShoppingSort.recentlyAdded:
+        list.sort((a, b) {
+          final ax = a.updatedAt;
+          final bx = b.updatedAt;
+          if (ax == null && bx == null) return 0;
+          if (ax == null) return 1;
+          if (bx == null) return -1;
+          return bx.compareTo(ax);
+        });
+        break;
+    }
+    return List.unmodifiable(list);
+  }
+
+  /// Shopping list grouped by category (for the grouped shopping view).
+  Map<String, List<GroceryItem>> get groupedShoppingList {
+    final groups = <String, List<GroceryItem>>{};
+    for (final item in shoppingList) {
+      groups.putIfAbsent(item.category, () => []).add(item);
+    }
+    final keys = groups.keys.toList()..sort();
+    return {for (final k in keys) k: groups[k]!};
+  }
+
+  void setShoppingSort(ShoppingSort sort) {
+    if (_shoppingSort == sort) return;
+    _shoppingSort = sort;
+    _settings.setShoppingSortIndex(sort.index);
+    notifyListeners();
+  }
 
   void setFilter(GroceryFilter filter) {
     if (_filter == filter) return;
@@ -260,6 +367,10 @@ class GroceryProvider extends ChangeNotifier {
           daysBefore: daysBefore,
         );
       }
+      // Schedule a daily digest summarizing items expiring within 3 days.
+      await _notifications.scheduleDailyDigest(
+        expiringCount: expiringSoonCount,
+      );
     } catch (e) {
       debugPrint('Failed to sync reminders: $e');
     }
@@ -274,16 +385,65 @@ class GroceryProvider extends ChangeNotifier {
     return _service.addGrocery(id, item);
   }
 
+  /// Sets an item's quantity directly without changing its status. Used for
+  /// adjusting how many to buy on the shopping list.
+  Future<void> setQuantity(
+    GroceryItem item,
+    double quantity, {
+    String? updatedBy,
+  }) {
+    final id = _householdId;
+    if (id == null) return Future.value();
+    final qty = quantity < 1 ? 1.0 : quantity;
+    return _service.updateGrocery(
+      id,
+      item.copyWith(
+        quantity: qty,
+        updatedBy: updatedBy,
+        updatedByName: updatedBy,
+      ),
+    );
+  }
+
+  /// Quickly adds a name straight to the shopping list (status needs-purchase)
+  /// without the full add form. Used for one-off buys not already tracked.
+  Future<void> quickAddToShoppingList(
+    String name, {
+    String? category,
+    String? unit,
+    double quantity = 1,
+    String? updatedBy,
+  }) {
+    final id = _householdId;
+    if (id == null) return Future.value();
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return Future.value();
+    return _service.addGrocery(
+      id,
+      GroceryItem(
+        id: '',
+        name: trimmed,
+        category: category ?? 'Other',
+        quantity: quantity,
+        unit: unit ?? 'pcs',
+        status: GroceryStatus.needsPurchase,
+        updatedBy: updatedBy,
+        updatedByName: updatedBy,
+      ),
+    );
+  }
+
   Future<void> updateGrocery(GroceryItem item) {
     final id = _householdId;
     if (id == null) return Future.value();
     return _service.updateGrocery(id, item);
   }
 
-  Future<void> markPurchased(GroceryItem item, {String? updatedBy}) {
+  Future<void> markPurchased(GroceryItem item,
+      {String? updatedBy, double? price}) async {
     final id = _householdId;
-    if (id == null) return Future.value();
-    return _service.updateStatus(
+    if (id == null) return;
+    await _service.updateStatus(
       id,
       item.id,
       GroceryStatus.inStock,
@@ -291,6 +451,28 @@ class GroceryProvider extends ChangeNotifier {
       purchaseDate: DateTime.now(),
       clearClaim: true,
     );
+    await _logPurchase(item, updatedBy: updatedBy, price: price);
+  }
+
+  /// Logs a purchase event to the household's purchase history.
+  Future<void> _logPurchase(GroceryItem item,
+      {String? updatedBy, double? price}) async {
+    final id = _householdId;
+    if (id == null) return;
+    try {
+      await _purchases.logPurchase(
+        id,
+        PurchaseRecord(
+          id: '',
+          name: item.name,
+          category: item.category,
+          price: price,
+          purchasedBy: updatedBy,
+        ),
+      );
+    } catch (_) {
+      // Non-critical; don't block the purchase on history logging.
+    }
   }
 
   /// Claims an item so other members know someone is buying it.
@@ -330,10 +512,11 @@ class GroceryProvider extends ChangeNotifier {
   }
 
   /// Marks a shopping-list item as purchased (kept visible in the cart section).
-  Future<void> markInCart(GroceryItem item, {String? updatedBy}) {
+  Future<void> markInCart(GroceryItem item,
+      {String? updatedBy, double? price}) async {
     final id = _householdId;
-    if (id == null) return Future.value();
-    return _service.updateStatus(
+    if (id == null) return;
+    await _service.updateStatus(
       id,
       item.id,
       GroceryStatus.purchased,
@@ -341,6 +524,7 @@ class GroceryProvider extends ChangeNotifier {
       purchaseDate: DateTime.now(),
       clearClaim: true,
     );
+    await _logPurchase(item, updatedBy: updatedBy, price: price);
   }
 
   /// Moves a purchased (in-cart) item back to the "needs purchase" list.
@@ -370,6 +554,10 @@ class GroceryProvider extends ChangeNotifier {
           updatedBy: updatedBy,
           purchaseDate: now,
         )));
+    // Log each as a purchase (no price for bulk mark-all).
+    for (final item in pending) {
+      await _logPurchase(item, updatedBy: updatedBy);
+    }
   }
 
   Future<void> deleteGrocery(String groceryId) {
@@ -384,6 +572,232 @@ class GroceryProvider extends ChangeNotifier {
     final id = _householdId;
     if (id == null) return Future.value();
     return _service.addGrocery(id, item);
+  }
+
+  /// Real-time stream of recent purchases for the active household.
+  Stream<List<PurchaseRecord>> watchPurchases() {
+    final id = _householdId;
+    if (id == null) return Stream.value(const []);
+    return _purchases.watchPurchases(id);
+  }
+
+  /// Returns item names ranked by how often the household has bought them,
+  /// filtered to those matching [query] (empty query returns all, ranked).
+  /// Used for smart autocomplete.
+  Future<List<String>> frequentItemNames(String query, {int limit = 5}) async {
+    final id = _householdId;
+    if (id == null) return const [];
+    final q = query.trim().toLowerCase();
+    try {
+      final purchases = await _purchases.getPurchases(id);
+      final counts = <String, int>{};
+      for (final p in purchases) {
+        if (q.isEmpty || p.name.toLowerCase().contains(q)) {
+          counts[p.name] = (counts[p.name] ?? 0) + 1;
+        }
+      }
+      final sorted = counts.keys.toList()
+        ..sort((a, b) => counts[b]!.compareTo(counts[a]!));
+      return sorted.take(limit).toList(growable: false);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Returns a CSV of the current inventory.
+  String inventoryCsv() => const ExportService().inventoryToCsv(_items);
+
+  /// Returns a CSV of the household's purchase history.
+  Future<String> purchasesCsv() async {
+    final id = _householdId;
+    if (id == null) return '';
+    final purchases = await _purchases.getPurchases(id);
+    return const ExportService().purchasesToCsv(purchases);
+  }
+
+  /// Estimates the total cost of the current "to buy" items using the most
+  /// recent known price per item name from purchase history. Returns null if
+  /// no prices are known. Also reports how many items had a known price.
+  Future<({double total, int priced, int totalItems})?>
+      estimateShoppingTotal() async {
+    final id = _householdId;
+    if (id == null) return null;
+    final toBuy = _items
+        .where((i) => i.status == GroceryStatus.needsPurchase)
+        .toList(growable: false);
+    if (toBuy.isEmpty) return null;
+    try {
+      final purchases = await _purchases.getPurchases(id);
+      // Most recent price per item name (purchases are newest-first).
+      final lastPrice = <String, double>{};
+      for (final p in purchases) {
+        if (p.price != null && !lastPrice.containsKey(p.name.toLowerCase())) {
+          lastPrice[p.name.toLowerCase()] = p.price!;
+        }
+      }
+      double total = 0;
+      int priced = 0;
+      for (final item in toBuy) {
+        final price = lastPrice[item.name.toLowerCase()];
+        if (price != null) {
+          total += price * item.quantity;
+          priced++;
+        }
+      }
+      return (total: total, priced: priced, totalItems: toBuy.length);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Suggests items the household is likely due to re-buy, based on how
+  /// regularly they've been purchased and how long since the last purchase.
+  ///
+  /// Logic: for each item name with >= 3 purchases, compute the average
+  /// interval between purchases. If days-since-last-purchase >= average
+  /// interval, it's "due". Items already in stock low / needs-purchase or
+  /// currently on the list are excluded. Returns suggestions sorted by how
+  /// overdue they are.
+  Future<List<LowStockSuggestion>> lowStockSuggestions({int limit = 5}) async {
+    final id = _householdId;
+    if (id == null) return const [];
+    try {
+      final purchases = await _purchases.getPurchases(id, limit: 1000);
+      // Group purchase timestamps by item name.
+      final byName = <String, List<DateTime>>{};
+      for (final p in purchases) {
+        final when = p.purchasedAt;
+        if (when == null) continue;
+        byName.putIfAbsent(p.name, () => []).add(when);
+      }
+
+      // Names already needing purchase / on the list — don't re-suggest.
+      final onList = _items
+          .where((i) =>
+              i.status == GroceryStatus.needsPurchase ||
+              i.status == GroceryStatus.purchased)
+          .map((i) => i.name.toLowerCase())
+          .toSet();
+
+      final now = DateTime.now();
+      final suggestions = <LowStockSuggestion>[];
+
+      byName.forEach((name, dates) {
+        if (dates.length < 3) return; // need a pattern
+        if (onList.contains(name.toLowerCase())) return;
+        dates.sort(); // oldest first
+        // Average interval between consecutive purchases, in days.
+        var totalDays = 0;
+        for (var i = 1; i < dates.length; i++) {
+          totalDays += dates[i].difference(dates[i - 1]).inDays;
+        }
+        final avgInterval = totalDays / (dates.length - 1);
+        if (avgInterval <= 0) return;
+        final daysSinceLast = now.difference(dates.last).inDays;
+        if (daysSinceLast >= avgInterval) {
+          suggestions.add(LowStockSuggestion(
+            name: name,
+            avgIntervalDays: avgInterval.round(),
+            daysSinceLast: daysSinceLast,
+            overdueBy: (daysSinceLast - avgInterval).round(),
+          ));
+        }
+      });
+
+      suggestions.sort((a, b) => b.overdueBy.compareTo(a.overdueBy));
+      return suggestions.take(limit).toList(growable: false);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Adds a suggested item to the shopping list. If an item with that name
+  /// already exists in inventory, it's flagged needs-purchase; otherwise a new
+  /// needs-purchase item is created.
+  Future<void> addSuggestionToList(
+    LowStockSuggestion suggestion, {
+    String? updatedBy,
+  }) async {
+    final id = _householdId;
+    if (id == null) return;
+    GroceryItem? existing;
+    for (final i in _items) {
+      if (i.name.toLowerCase() == suggestion.name.toLowerCase()) {
+        existing = i;
+        break;
+      }
+    }
+    if (existing != null) {
+      await _service.updateStatus(
+        id,
+        existing.id,
+        GroceryStatus.needsPurchase,
+        updatedBy: updatedBy,
+      );
+    } else {
+      await _service.addGrocery(
+        id,
+        GroceryItem(
+          id: '',
+          name: suggestion.name,
+          category: 'Other',
+          quantity: 1,
+          unit: 'pcs',
+          status: GroceryStatus.needsPurchase,
+          updatedBy: updatedBy,
+          updatedByName: updatedBy,
+        ),
+      );
+    }
+  }
+
+  /// Deletes multiple items. Returns the deleted items so callers can offer
+  /// an undo (restore).
+  Future<List<GroceryItem>> deleteItems(Iterable<GroceryItem> items) async {
+    final id = _householdId;
+    if (id == null) return const [];
+    final list = items.toList(growable: false);
+    await Future.wait(list.map((i) => _service.deleteGrocery(id, i.id)));
+    return list;
+  }
+
+  /// Restores multiple previously deleted items (undo for bulk delete).
+  Future<void> restoreItems(Iterable<GroceryItem> items) async {
+    final id = _householdId;
+    if (id == null) return;
+    await Future.wait(items.map((i) => _service.addGrocery(id, i)));
+  }
+
+  /// Marks multiple items as "needs purchase" (bulk add to shopping list).
+  Future<void> addItemsToShoppingList(
+    Iterable<GroceryItem> items, {
+    String? updatedBy,
+  }) async {
+    final id = _householdId;
+    if (id == null) return;
+    await Future.wait(items.map((i) => _service.updateStatus(
+          id,
+          i.id,
+          GroceryStatus.needsPurchase,
+          updatedBy: updatedBy,
+        )));
+  }
+
+  /// Changes the category of multiple items at once.
+  Future<void> changeCategory(
+    Iterable<GroceryItem> items,
+    String category, {
+    String? updatedBy,
+  }) async {
+    final id = _householdId;
+    if (id == null) return;
+    await Future.wait(items.map((i) => _service.updateGrocery(
+          id,
+          i.copyWith(
+              category: category,
+              updatedBy: updatedBy,
+              updatedByName: updatedBy),
+        )));
   }
 
   /// Adjusts an item's quantity by [delta] (clamped at 0). When the quantity
@@ -412,6 +826,7 @@ class GroceryProvider extends ChangeNotifier {
       quantity: newQty,
       status: newStatus,
       updatedBy: updatedBy,
+      updatedByName: updatedBy,
     );
     return _service.updateGrocery(id, updated);
   }

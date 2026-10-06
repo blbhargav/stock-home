@@ -1,0 +1,53 @@
+{
+  "@@locale": "en",
+  "appName": "StockHome",
+  "tagline": "Shared home grocery tracker",
+
+  "signIn": "Sign in",
+  "createAccount": "Create account",
+  "name": "Name",
+  "email": "Email",
+  "password": "Password",
+  "forgotPassword": "Forgot password?",
+  "newToApp": "New to StockHome?",
+  "alreadyHaveAccount": "Already have an account?",
+
+  "tabInventory": "Inventory",
+  "tabCategories": "Categories",
+  "tabShopping": "Shopping",
+
+  "appearance": "APPEARANCE",
+  "themeSystem": "System",
+  "themeLight": "Light",
+  "themeDark": "Dark",
+  "language": "LANGUAGE",
+
+  "reminders": "REMINDERS",
+  "expiryReminders": "Expiry reminders",
+  "household": "HOUSEHOLD",
+  "householdCode": "Household code",
+  "inviteMembers": "Invite members",
+  "manageMembers": "Manage members",
+  "spendingInsights": "Spending & insights",
+  "activity": "Activity",
+  "exportData": "Export data",
+  "switchHousehold": "Switch household",
+  "signOut": "Sign out",
+
+  "addToShoppingList": "Add to shopping list",
+  "itemName": "Item name",
+  "quantity": "Quantity",
+  "unit": "Unit",
+  "category": "Category",
+  "add": "Add",
+  "cancel": "Cancel",
+  "save": "Save",
+  "delete": "Delete",
+  "edit": "Edit",
+  "markPurchased": "Mark purchased",
+
+  "statusInStock": "In stock",
+  "statusRunningLow": "Running low",
+  "statusNeedsPurchase": "Needs purchase",
+  "statusPurchased": "Purchased"
+}

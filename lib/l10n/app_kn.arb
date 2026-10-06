@@ -1,0 +1,53 @@
+{
+  "@@locale": "kn",
+  "appName": "StockHome",
+  "tagline": "ಹಂಚಿಕೊಂಡ ಮನೆ ಕಿರಾಣಿ ಟ್ರ್ಯಾಕರ್",
+
+  "signIn": "ಸೈನ್ ಇನ್",
+  "createAccount": "ಖಾತೆ ರಚಿಸಿ",
+  "name": "ಹೆಸರು",
+  "email": "ಇಮೇಲ್",
+  "password": "ಪಾಸ್‌ವರ್ಡ್",
+  "forgotPassword": "ಪಾಸ್‌ವರ್ಡ್ ಮರೆತಿರಾ?",
+  "newToApp": "StockHomeಗೆ ಹೊಸಬರೇ?",
+  "alreadyHaveAccount": "ಈಗಾಗಲೇ ಖಾತೆ ಇದೆಯೇ?",
+
+  "tabInventory": "ದಾಸ್ತಾನು",
+  "tabCategories": "ವರ್ಗಗಳು",
+  "tabShopping": "ಶಾಪಿಂಗ್",
+
+  "appearance": "ಕಾಣಿಸುವಿಕೆ",
+  "themeSystem": "ಸಿಸ್ಟಂ",
+  "themeLight": "ಲೈಟ್",
+  "themeDark": "ಡಾರ್ಕ್",
+  "language": "ಭಾಷೆ",
+
+  "reminders": "ಜ್ಞಾಪನೆಗಳು",
+  "expiryReminders": "ಅವಧಿ ಮುಗಿಯುವ ಜ್ಞಾಪನೆಗಳು",
+  "household": "ಮನೆ",
+  "householdCode": "ಮನೆ ಕೋಡ್",
+  "inviteMembers": "ಸದಸ್ಯರನ್ನು ಆಹ್ವಾನಿಸಿ",
+  "manageMembers": "ಸದಸ್ಯರನ್ನು ನಿರ್ವಹಿಸಿ",
+  "spendingInsights": "ಖರ್ಚು & ಒಳನೋಟಗಳು",
+  "activity": "ಚಟುವಟಿಕೆ",
+  "exportData": "ಡೇಟಾ ರಫ್ತು",
+  "switchHousehold": "ಮನೆ ಬದಲಾಯಿಸಿ",
+  "signOut": "ಸೈನ್ ಔಟ್",
+
+  "addToShoppingList": "ಶಾಪಿಂಗ್ ಪಟ್ಟಿಗೆ ಸೇರಿಸಿ",
+  "itemName": "ವಸ್ತುವಿನ ಹೆಸರು",
+  "quantity": "ಪ್ರಮಾಣ",
+  "unit": "ಘಟಕ",
+  "category": "ವರ್ಗ",
+  "add": "ಸೇರಿಸಿ",
+  "cancel": "ರದ್ದುಮಾಡಿ",
+  "save": "ಉಳಿಸಿ",
+  "delete": "ಅಳಿಸಿ",
+  "edit": "ಸಂಪಾದಿಸಿ",
+  "markPurchased": "ಖರೀದಿಸಿದಂತೆ ಗುರುತಿಸಿ",
+
+  "statusInStock": "ದಾಸ್ತಾನಿನಲ್ಲಿದೆ",
+  "statusRunningLow": "ಕಡಿಮೆಯಾಗುತ್ತಿದೆ",
+  "statusNeedsPurchase": "ಖರೀದಿಸಬೇಕು",
+  "statusPurchased": "ಖರೀದಿಸಲಾಗಿದೆ"
+}

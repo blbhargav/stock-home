@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.pantrypal" "\0"
-            VALUE "FileDescription", "pantrypal" "\0"
+            VALUE "CompanyName", "com.blb" "\0"
+            VALUE "FileDescription", "stockhome" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "pantrypal" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.pantrypal. All rights reserved." "\0"
-            VALUE "OriginalFilename", "pantrypal.exe" "\0"
-            VALUE "ProductName", "pantrypal" "\0"
+            VALUE "InternalName", "stockhome" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 com.blb. All rights reserved." "\0"
+            VALUE "OriginalFilename", "stockhome.exe" "\0"
+            VALUE "ProductName", "stockhome" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

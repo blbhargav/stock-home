@@ -6,6 +6,9 @@ class SettingsService {
   static const _kExpiryDaysBefore = 'expiry_days_before';
   static const _kSortIndex = 'inventory_sort_index';
   static const _kGroupByCategory = 'inventory_group_by_category';
+  static const _kThemeMode = 'theme_mode'; // 0=system,1=light,2=dark
+  static const _kShoppingSortIndex = 'shopping_sort_index';
+  static const _kLanguageCode = 'language_code';
 
   Future<bool> getExpiryRemindersEnabled() async {
     final prefs = await SharedPreferences.getInstance();
@@ -45,5 +48,40 @@ class SettingsService {
   Future<void> setGroupByCategory(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kGroupByCategory, value);
+  }
+
+  /// Theme mode index: 0 = system, 1 = light, 2 = dark.
+  Future<int> getThemeModeIndex() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_kThemeMode) ?? 0;
+  }
+
+  Future<void> setThemeModeIndex(int index) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_kThemeMode, index);
+  }
+
+  Future<int> getShoppingSortIndex() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_kShoppingSortIndex) ?? 0;
+  }
+
+  Future<void> setShoppingSortIndex(int index) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_kShoppingSortIndex, index);
+  }
+
+  Future<String?> getLanguageCode() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_kLanguageCode);
+  }
+
+  Future<void> setLanguageCode(String? code) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (code == null || code.isEmpty) {
+      await prefs.remove(_kLanguageCode);
+    } else {
+      await prefs.setString(_kLanguageCode, code);
+    }
   }
 }

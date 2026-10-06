@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../models/grocery_categories.dart';
 import '../models/grocery_item.dart';
 import '../providers/auth_provider.dart';
 import '../providers/grocery_provider.dart';
@@ -8,7 +11,12 @@ import '../services/household_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/account_sheet.dart';
 import '../widgets/grocery_tile.dart';
+import 'activity_feed_screen.dart';
+import 'categories_tab.dart';
 import 'grocery_form_screen.dart';
+import 'insights_screen.dart';
+import 'item_detail_screen.dart';
+import 'household_setup_screen.dart';
 import 'members_screen.dart';
 
 /// Main screen: grocery inventory with filters plus a shopping-list tab.
@@ -28,6 +36,135 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => GroceryFormScreen(existing: existing),
       ),
     );
+  }
+
+  void _openDetail(BuildContext context, GroceryItem item) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ItemDetailScreen(itemId: item.id),
+      ),
+    );
+  }
+
+  /// Quick-add a one-off item straight to the shopping list.
+  Future<void> _quickAddToList(BuildContext context) async {
+    final nameCtrl = TextEditingController();
+    final qtyCtrl = TextEditingController(text: '1');
+    String category = 'Other';
+    String unit = GroceryCategories.units.first;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('Add to shopping list'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    labelText: 'Item name',
+                    hintText: 'e.g. Paper plates',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: TextField(
+                        controller: qtyCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                              RegExp(r'^\d*[.,]?\d*')),
+                        ],
+                        decoration: const InputDecoration(
+                          labelText: 'Qty',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 3,
+                      child: DropdownButtonFormField<String>(
+                        initialValue: unit,
+                        isExpanded: true,
+                        decoration: const InputDecoration(labelText: 'Unit'),
+                        items: GroceryCategories.units
+                            .map((u) =>
+                                DropdownMenuItem(value: u, child: Text(u)))
+                            .toList(),
+                        onChanged: (v) =>
+                            setLocal(() => unit = v ?? unit),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: category,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Category'),
+                  items: GroceryCategories.all
+                      .map((c) =>
+                          DropdownMenuItem(value: c, child: Text(c)))
+                      .toList(),
+                  onChanged: (v) => setLocal(() => category = v ?? 'Other'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Add'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    final name = nameCtrl.text.trim();
+    final quantity =
+        double.tryParse(qtyCtrl.text.trim().replaceAll(',', '.')) ?? 1;
+    // Dispose controllers after the dialog's close animation completes, so the
+    // dismissing TextField doesn't touch a disposed controller.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      nameCtrl.dispose();
+      qtyCtrl.dispose();
+    });
+    if (confirmed != true || name.isEmpty || !context.mounted) return;
+
+    final provider = context.read<GroceryProvider>();
+    final who = context.read<AuthProvider>().resolvedDisplayName;
+    await provider.quickAddToShoppingList(
+      name,
+      category: category,
+      unit: unit,
+      quantity: quantity <= 0 ? 1 : quantity,
+      updatedBy: who,
+    );
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text('$name added to shopping list'),
+          ),
+        );
+    }
   }
 
   Future<void> _confirmDelete(
@@ -93,7 +230,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     if (confirmed == true && context.mounted) {
       await provider.markAllInCart(
-        updatedBy: context.read<AuthProvider>().user?.displayName,
+        updatedBy: context.read<AuthProvider>().resolvedDisplayName,
       );
     }
   }
@@ -102,9 +239,15 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_tabIndex == 0 ? 'StockHome' : 'Shopping List'),
+        title: Text(
+          _tabIndex == 0
+              ? 'StockHome'
+              : _tabIndex == 1
+                  ? 'Categories'
+                  : 'Shopping List',
+        ),
         actions: [
-          if (_tabIndex == 1)
+          if (_tabIndex == 2)
             Consumer<GroceryProvider>(
               builder: (context, provider, _) {
                 if (provider.needsPurchaseCount == 0) {
@@ -129,14 +272,22 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
             child: _tabIndex == 0
                 ? const _InventoryTab()
-                : const _ShoppingListTab(),
+                : _tabIndex == 1
+                    ? const CategoriesTab()
+                    : const _ShoppingListTab(),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openForm(context),
+        onPressed: () {
+          if (_tabIndex == 2) {
+            _quickAddToList(context);
+          } else {
+            _openForm(context);
+          }
+        },
         icon: const Icon(Icons.add),
-        label: const Text('Add'),
+        label: Text(_tabIndex == 2 ? 'Quick add' : 'Add'),
       ),
       bottomNavigationBar: Consumer<GroceryProvider>(
         builder: (context, provider, _) {
@@ -148,6 +299,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icon(Icons.inventory_2_outlined),
                 selectedIcon: Icon(Icons.inventory_2),
                 label: 'Inventory',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.category_outlined),
+                selectedIcon: Icon(Icons.category),
+                label: 'Categories',
               ),
               NavigationDestination(
                 icon: Badge(
@@ -179,8 +335,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!context.mounted) return;
 
     final info = AccountInfo(
-      displayName:
-          auth.user?.displayName ?? auth.user?.email ?? 'Household member',
+      displayName: auth.resolvedDisplayName,
       email: auth.user?.email ?? '',
       householdName: household?.name ?? 'Your household',
       householdCode: auth.householdId ?? '—',
@@ -190,37 +345,22 @@ class _HomeScreenState extends State<HomeScreen> {
     await showAccountSheet(
       context,
       info: info,
-      onSwitchHousehold: () async {
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Switch household?'),
-            content: const Text(
-              'You will leave this household and can create or join another. '
-              'You can rejoin later with the household code.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Leave'),
-              ),
-            ],
-          ),
-        );
-        if (confirmed == true) {
-          await auth.leaveHousehold();
-          // AppGate routes back to HouseholdSetupScreen once householdId clears.
-        }
-      },
+      onSwitchHousehold: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const HouseholdSetupScreen(addingAnother: true),
+        ),
+      ),
       onSignOut: () => auth.signOut(),
       onRemindersChanged: () =>
           context.read<GroceryProvider>().refreshReminders(),
       onManageMembers: () => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const MembersScreen()),
+      ),
+      onInsights: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const InsightsScreen()),
+      ),
+      onActivity: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const ActivityFeedScreen()),
       ),
     );
 
@@ -239,10 +379,39 @@ class _InventoryTab extends StatefulWidget {
 class _InventoryTabState extends State<_InventoryTab> {
   final _searchCtrl = TextEditingController();
 
+  // Multi-select state.
+  bool _selectionMode = false;
+  final Set<String> _selectedIds = {};
+
   @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  void _enterSelection(String id) {
+    setState(() {
+      _selectionMode = true;
+      _selectedIds.add(id);
+    });
+  }
+
+  void _toggleSelected(String id) {
+    setState(() {
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+        if (_selectedIds.isEmpty) _selectionMode = false;
+      } else {
+        _selectedIds.add(id);
+      }
+    });
+  }
+
+  void _exitSelection() {
+    setState(() {
+      _selectionMode = false;
+      _selectedIds.clear();
+    });
   }
 
   @override
@@ -290,6 +459,7 @@ class _InventoryTabState extends State<_InventoryTab> {
                 ),
               ),
             ),
+            _PantrySummaryStrip(provider: provider),
             SizedBox(
               height: 44,
               child: ListView(
@@ -372,23 +542,75 @@ class _InventoryTabState extends State<_InventoryTab> {
     }
 
     final home = context.findAncestorStateOfType<_HomeScreenState>()!;
-    final name = context.read<AuthProvider>().user?.displayName;
+    final name = context.read<AuthProvider>().resolvedDisplayName;
 
-    GroceryTile buildTile(GroceryItem item) => GroceryTile(
-          item: item,
-          onTap: () => home._openForm(context, existing: item),
-          onMarkPurchased: () => provider.markPurchased(item, updatedBy: name),
-          onMarkNeedsPurchase: () =>
-              provider.markNeedsPurchase(item, updatedBy: name),
-          onDelete: () => home._confirmDelete(context, item),
-          onIncrement: () => provider.adjustQuantity(item, 1, updatedBy: name),
-          onDecrement: () => provider.adjustQuantity(item, -1, updatedBy: name),
-        );
+    Widget buildTile(GroceryItem item) {
+      final selected = _selectedIds.contains(item.id);
+      final tile = GroceryTile(
+        item: item,
+        onTap: () {
+          if (_selectionMode) {
+            _toggleSelected(item.id);
+          } else {
+            home._openDetail(context, item);
+          }
+        },
+        onEdit: () => home._openForm(context, existing: item),
+        onMarkPurchased: () => provider.markPurchased(item, updatedBy: name),
+        onMarkNeedsPurchase: () =>
+            provider.markNeedsPurchase(item, updatedBy: name),
+        onDelete: () => home._confirmDelete(context, item),
+        onIncrement: () => provider.adjustQuantity(item, 1, updatedBy: name),
+        onDecrement: () => provider.adjustQuantity(item, -1, updatedBy: name),
+      );
 
+      final scheme = Theme.of(context).colorScheme;
+      return GestureDetector(
+        onLongPress: _selectionMode ? null : () => _enterSelection(item.id),
+        child: Stack(
+          children: [
+            // Dim/absorb tile's own gestures when selecting so tap toggles.
+            if (_selectionMode)
+              IgnorePointer(
+                child: Opacity(opacity: selected ? 1 : 0.85, child: tile),
+              )
+            else
+              tile,
+            if (_selectionMode)
+              Positioned.fill(
+                child: Material(
+                  color: selected
+                      ? scheme.primary.withValues(alpha: 0.10)
+                      : Colors.transparent,
+                  child: InkWell(
+                    onTap: () => _toggleSelected(item.id),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 20),
+                        child: Icon(
+                          selected
+                              ? Icons.check_circle
+                              : Icons.radio_button_unchecked,
+                          color: selected
+                              ? scheme.primary
+                              : scheme.outlineVariant,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
+
+    Widget list;
     if (provider.groupByCategory) {
       final groups = provider.groupedVisibleItems;
       final categories = groups.keys.toList();
-      return ListView.builder(
+      list = ListView.builder(
         padding: const EdgeInsets.only(top: 4, bottom: 96),
         itemCount: categories.length,
         itemBuilder: (context, index) {
@@ -414,12 +636,171 @@ class _InventoryTabState extends State<_InventoryTab> {
           );
         },
       );
+    } else {
+      list = ListView.builder(
+        padding: const EdgeInsets.only(top: 4, bottom: 96),
+        itemCount: items.length,
+        itemBuilder: (context, index) => buildTile(items[index]),
+      );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.only(top: 4, bottom: 96),
-      itemCount: items.length,
-      itemBuilder: (context, index) => buildTile(items[index]),
+    if (!_selectionMode) return list;
+
+    // Selection action bar at the bottom.
+    return Column(
+      children: [
+        Expanded(child: list),
+        _SelectionActionBar(
+          count: _selectedIds.length,
+          onCancel: _exitSelection,
+          onDelete: () => _bulkDelete(context, provider),
+          onAddToList: () => _bulkAddToList(context, provider, name),
+          onChangeCategory: () => _bulkChangeCategory(context, provider, name),
+        ),
+      ],
+    );
+  }
+
+  List<GroceryItem> _selectedItems(GroceryProvider provider) => provider
+      .allItems
+      .where((i) => _selectedIds.contains(i.id))
+      .toList(growable: false);
+
+  Future<void> _bulkDelete(
+      BuildContext context, GroceryProvider provider) async {
+    final selected = _selectedItems(provider);
+    if (selected.isEmpty) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete ${selected.length} items?'),
+        content: const Text('This removes them from the household list.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final deleted = await provider.deleteItems(selected);
+    _exitSelection();
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text('${deleted.length} items deleted'),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () => provider.restoreItems(deleted),
+          ),
+        ),
+      );
+  }
+
+  Future<void> _bulkAddToList(
+      BuildContext context, GroceryProvider provider, String name) async {
+    final selected = _selectedItems(provider);
+    if (selected.isEmpty) return;
+    final messenger = ScaffoldMessenger.of(context);
+    await provider.addItemsToShoppingList(selected, updatedBy: name);
+    _exitSelection();
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text('${selected.length} items added to shopping list'),
+        ),
+      );
+  }
+
+  Future<void> _bulkChangeCategory(
+      BuildContext context, GroceryProvider provider, String name) async {
+    final selected = _selectedItems(provider);
+    if (selected.isEmpty) return;
+    final category = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            for (final c in GroceryCategories.all)
+              ListTile(
+                title: Text(c),
+                onTap: () => Navigator.pop(ctx, c),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (category == null) return;
+    await provider.changeCategory(selected, category, updatedBy: name);
+    _exitSelection();
+  }
+}
+
+class _SelectionActionBar extends StatelessWidget {
+  const _SelectionActionBar({
+    required this.count,
+    required this.onCancel,
+    required this.onDelete,
+    required this.onAddToList,
+    required this.onChangeCategory,
+  });
+
+  final int count;
+  final VoidCallback onCancel;
+  final VoidCallback onDelete;
+  final VoidCallback onAddToList;
+  final VoidCallback onChangeCategory;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      elevation: 8,
+      color: scheme.surfaceContainerHigh,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Row(
+            children: [
+              IconButton(
+                tooltip: 'Cancel',
+                icon: const Icon(Icons.close),
+                onPressed: onCancel,
+              ),
+              Text('$count selected',
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              const Spacer(),
+              IconButton(
+                tooltip: 'Add to shopping list',
+                icon: const Icon(Icons.add_shopping_cart_outlined),
+                onPressed: count == 0 ? null : onAddToList,
+              ),
+              IconButton(
+                tooltip: 'Change category',
+                icon: const Icon(Icons.category_outlined),
+                onPressed: count == 0 ? null : onChangeCategory,
+              ),
+              IconButton(
+                tooltip: 'Delete',
+                icon: Icon(Icons.delete_outline,
+                    color: AppTheme.statusColor(GroceryStatus.needsPurchase)),
+                onPressed: count == 0 ? null : onDelete,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -455,11 +836,16 @@ class _ShoppingListTab extends StatelessWidget {
   static String _fmtQty(double qty) =>
       qty == qty.truncateToDouble() ? qty.toInt().toString() : qty.toString();
 
-  void _markPurchased(BuildContext context, GroceryProvider provider,
-      GroceryItem item) {
-    final name = context.read<AuthProvider>().user?.displayName;
-    provider.markInCart(item, updatedBy: name);
-    ScaffoldMessenger.of(context)
+  Future<void> _markPurchased(BuildContext context, GroceryProvider provider,
+      GroceryItem item) async {
+    final name = context.read<AuthProvider>().resolvedDisplayName;
+    final messenger = ScaffoldMessenger.of(context);
+    final price = await _askPrice(context, item.name);
+    // _askPrice returns a sentinel for cancel vs. a (possibly null) price.
+    if (price == _priceCancelled) return;
+    await provider.markInCart(item,
+        updatedBy: name, price: price as double?);
+    messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
@@ -473,6 +859,63 @@ class _ShoppingListTab extends StatelessWidget {
       );
   }
 
+  /// Sentinel distinguishing "user cancelled" from "no price entered".
+  static const Object _priceCancelled = Object();
+
+  /// Prompts for an optional price. Returns the price (double), null if the
+  /// user confirmed without a price, or [_priceCancelled] if dismissed.
+  Future<Object?> _askPrice(BuildContext context, String itemName) async {
+    final controller = TextEditingController();
+    final result = await showDialog<Object?>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Mark "$itemName" purchased'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Add the price? (optional)'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d*[.,]?\d*')),
+              ],
+              decoration: const InputDecoration(
+                prefixText: '₹ ',
+                hintText: '0.00',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, _priceCancelled),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, null),
+            child: const Text('Skip'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final text = controller.text.trim().replaceAll(',', '.');
+              final value = double.tryParse(text);
+              Navigator.pop(ctx, value);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
+    return result;
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -481,13 +924,40 @@ class _ShoppingListTab extends StatelessWidget {
         final items = provider.shoppingList;
         if (items.isEmpty) {
           final home = context.findAncestorStateOfType<_HomeScreenState>()!;
-          return _EmptyState(
-            icon: Icons.check_circle_outline,
-            title: 'Shopping list is empty',
-            message:
-                'Items you mark as "Needs purchase" in your inventory will appear here.',
-            actionLabel: 'Add item',
-            onAction: () => home._openForm(context),
+          return FutureBuilder<List<LowStockSuggestion>>(
+            future: provider.lowStockSuggestions(),
+            builder: (context, snap) {
+              final hasSuggestions = (snap.data ?? const []).isNotEmpty;
+              if (!hasSuggestions) {
+                return _EmptyState(
+                  icon: Icons.check_circle_outline,
+                  title: 'Shopping list is empty',
+                  message:
+                      'Mark inventory items as "Needs purchase", or quick-add a '
+                      'one-off item straight to the list.',
+                  actionLabel: 'Quick add',
+                  onAction: () => home._quickAddToList(context),
+                );
+              }
+              return ListView(
+                children: [
+                  _SuggestionsSection(provider: provider),
+                  const SizedBox(height: 24),
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        'Your shopping list is empty.',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(color: scheme.onSurfaceVariant),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           );
         }
 
@@ -498,7 +968,7 @@ class _ShoppingListTab extends StatelessWidget {
             .where((i) => i.status == GroceryStatus.purchased)
             .toList(growable: false);
         final home = context.findAncestorStateOfType<_HomeScreenState>()!;
-        final name = context.read<AuthProvider>().user?.displayName;
+        final name = context.read<AuthProvider>().resolvedDisplayName;
 
         Widget divider() => Divider(
               height: 1,
@@ -515,6 +985,15 @@ class _ShoppingListTab extends StatelessWidget {
                 done: inCart.length,
               ),
             ),
+            SliverToBoxAdapter(
+              child: _ShoppingSortBar(provider: provider),
+            ),
+            SliverToBoxAdapter(
+              child: _EstimatedTotal(provider: provider),
+            ),
+            SliverToBoxAdapter(
+              child: _SuggestionsSection(provider: provider),
+            ),
             if (toBuy.isNotEmpty) ...[
               _SectionHeader(label: 'To buy', count: toBuy.length),
               SliverList.separated(
@@ -530,9 +1009,15 @@ class _ShoppingListTab extends StatelessWidget {
                     icon: _iconForCategory(item.category),
                     fmtQty: _fmtQty,
                     currentUid: myUid,
-                    onTap: () => home._openForm(context, existing: item),
+                    onTap: () => home._openDetail(context, item),
                     onMarkPurchased: () =>
                         _markPurchased(context, provider, item),
+                    onIncrement: () => provider.setQuantity(
+                        item, item.quantity + 1,
+                        updatedBy: name),
+                    onDecrement: () => provider.setQuantity(
+                        item, item.quantity - 1,
+                        updatedBy: name),
                     onToggleClaim: () {
                       if (item.claimedBy == myUid && item.isClaimed) {
                         provider.unclaimItem(item);
@@ -540,9 +1025,7 @@ class _ShoppingListTab extends StatelessWidget {
                         provider.claimItem(
                           item,
                           uid: myUid,
-                          name: auth.user?.displayName ??
-                              auth.user?.email ??
-                              'Someone',
+                          name: auth.resolvedDisplayName,
                         );
                       }
                     },
@@ -563,7 +1046,7 @@ class _ShoppingListTab extends StatelessWidget {
                     item: item,
                     icon: _iconForCategory(item.category),
                     fmtQty: _fmtQty,
-                    onTap: () => home._openForm(context, existing: item),
+                    onTap: () => home._openDetail(context, item),
                     onUnmark: () =>
                         provider.unmarkFromCart(item, updatedBy: name),
                   );
@@ -574,6 +1057,214 @@ class _ShoppingListTab extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _SuggestionsSection extends StatefulWidget {
+  const _SuggestionsSection({required this.provider});
+
+  final GroceryProvider provider;
+
+  @override
+  State<_SuggestionsSection> createState() => _SuggestionsSectionState();
+}
+
+class _SuggestionsSectionState extends State<_SuggestionsSection> {
+  late Future<List<LowStockSuggestion>> _future;
+  final Set<String> _added = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _future = widget.provider.lowStockSuggestions();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return FutureBuilder<List<LowStockSuggestion>>(
+      future: _future,
+      builder: (context, snapshot) {
+        final all = snapshot.data ?? const [];
+        final suggestions =
+            all.where((s) => !_added.contains(s.name)).toList();
+        if (suggestions.isEmpty) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.auto_awesome,
+                      size: 16, color: scheme.primary),
+                  const SizedBox(width: 6),
+                  Text(
+                    'SUGGESTED — RUNNING LOW?',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: scheme.primary,
+                      letterSpacing: 1.1,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ...suggestions.map((s) => Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+                    decoration: BoxDecoration(
+                      color: scheme.surfaceContainerHighest
+                          .withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(s.name,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 2),
+                              Text(
+                                s.reason,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                    color: scheme.onSurfaceVariant),
+                              ),
+                            ],
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () => _add(context, s),
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text('Add'),
+                        ),
+                      ],
+                    ),
+                  )),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _add(BuildContext context, LowStockSuggestion s) async {
+    final name = context.read<AuthProvider>().resolvedDisplayName;
+    setState(() => _added.add(s.name));
+    await widget.provider.addSuggestionToList(s, updatedBy: name);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text('${s.name} added to shopping list'),
+          ),
+        );
+    }
+  }
+}
+
+class _EstimatedTotal extends StatelessWidget {
+  const _EstimatedTotal({required this.provider});
+
+  final GroceryProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return FutureBuilder<({double total, int priced, int totalItems})?>(
+      future: provider.estimateShoppingTotal(),
+      builder: (context, snapshot) {
+        final data = snapshot.data;
+        if (data == null || data.priced == 0) {
+          return const SizedBox.shrink();
+        }
+        final currency =
+            NumberFormat.currency(symbol: '₹', decimalDigits: 0);
+        final approx = data.priced < data.totalItems;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: scheme.secondaryContainer.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.payments_outlined,
+                    size: 18, color: scheme.onSecondaryContainer),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Estimated total: ${approx ? '~' : ''}${currency.format(data.total)}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: scheme.onSecondaryContainer,
+                    ),
+                  ),
+                ),
+                if (approx)
+                  Text(
+                    '${data.priced}/${data.totalItems} priced',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onSecondaryContainer
+                              .withValues(alpha: 0.8),
+                        ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ShoppingSortBar extends StatelessWidget {
+  const _ShoppingSortBar({required this.provider});
+
+  final GroceryProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 8, 0),
+      child: Row(
+        children: [
+          Icon(Icons.sort, size: 18, color: scheme.onSurfaceVariant),
+          const SizedBox(width: 6),
+          PopupMenuButton<ShoppingSort>(
+            initialValue: provider.shoppingSort,
+            onSelected: provider.setShoppingSort,
+            tooltip: 'Sort shopping list',
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  provider.shoppingSort.label,
+                  style: TextStyle(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Icon(Icons.arrow_drop_down, color: scheme.primary),
+              ],
+            ),
+            itemBuilder: (context) => ShoppingSort.values
+                .map((s) => PopupMenuItem(value: s, child: Text(s.label)))
+                .toList(),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -711,6 +1402,8 @@ class _SwipeToPurchaseTile extends StatelessWidget {
     required this.onMarkPurchased,
     required this.onToggleClaim,
     required this.currentUid,
+    this.onIncrement,
+    this.onDecrement,
   });
 
   final GroceryItem item;
@@ -720,6 +1413,8 @@ class _SwipeToPurchaseTile extends StatelessWidget {
   final VoidCallback onMarkPurchased;
   final VoidCallback onToggleClaim;
   final String? currentUid;
+  final VoidCallback? onIncrement;
+  final VoidCallback? onDecrement;
 
   @override
   Widget build(BuildContext context) {
@@ -758,6 +1453,9 @@ class _SwipeToPurchaseTile extends StatelessWidget {
         fmtQty: fmtQty,
         onTap: onTap,
         showSwipeHint: !item.isClaimed,
+        onIncrement: onIncrement,
+        onDecrement: onDecrement,
+        onCheckTap: onMarkPurchased,
         claimBadge: item.isClaimed
             ? _ClaimBadge(
                 label: claimedByMe
@@ -813,6 +1511,60 @@ class _PurchasedTile extends StatelessWidget {
   }
 }
 
+class _CheckCircle extends StatelessWidget {
+  const _CheckCircle({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final green = AppTheme.statusColor(GroceryStatus.inStock);
+    return Tooltip(
+      message: 'Mark purchased',
+      child: InkResponse(
+        onTap: onTap,
+        radius: 26,
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: green, width: 2),
+            color: green.withValues(alpha: 0.08),
+          ),
+          child: Icon(Icons.check, color: green),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniStepBtn extends StatelessWidget {
+  const _MiniStepBtn({required this.icon, required this.onPressed});
+
+  final IconData icon;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: 28,
+      height: 28,
+      child: IconButton(
+        padding: EdgeInsets.zero,
+        iconSize: 16,
+        style: IconButton.styleFrom(
+          backgroundColor: scheme.surfaceContainerHighest,
+          shape: const CircleBorder(),
+        ),
+        onPressed: onPressed,
+        icon: Icon(icon),
+      ),
+    );
+  }
+}
+
 class _ShoppingTileContent extends StatelessWidget {
   const _ShoppingTileContent({
     required this.item,
@@ -823,6 +1575,9 @@ class _ShoppingTileContent extends StatelessWidget {
     this.strikethrough = false,
     this.showSwipeHint = false,
     this.claimBadge,
+    this.onIncrement,
+    this.onDecrement,
+    this.onCheckTap,
   });
 
   final GroceryItem item;
@@ -833,6 +1588,12 @@ class _ShoppingTileContent extends StatelessWidget {
   final bool strikethrough;
   final bool showSwipeHint;
   final Widget? claimBadge;
+  final VoidCallback? onIncrement;
+  final VoidCallback? onDecrement;
+
+  /// When provided, the leading element becomes a tappable check-circle that
+  /// marks the item purchased (used on the "to buy" list).
+  final VoidCallback? onCheckTap;
 
   @override
   Widget build(BuildContext context) {
@@ -850,15 +1611,17 @@ class _ShoppingTileContent extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.10),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, size: 22, color: iconColor),
-              ),
+              onCheckTap != null
+                  ? _CheckCircle(onTap: onCheckTap!)
+                  : Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: iconColor.withValues(alpha: 0.10),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(icon, size: 22, color: iconColor),
+                    ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -891,16 +1654,41 @@ class _ShoppingTileContent extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 3),
-                    Text(
-                      '${fmtQty(item.quantity)} ${item.unit} · ${item.category}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        decoration: strikethrough
-                            ? TextDecoration.lineThrough
-                            : null,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${fmtQty(item.quantity)} ${item.unit} · ${item.category}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                              decoration: strikethrough
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (onIncrement != null || onDecrement != null) ...[
+                          _MiniStepBtn(
+                            icon: Icons.remove,
+                            onPressed: item.quantity <= 1 ? null : onDecrement,
+                          ),
+                          Padding(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 6),
+                            child: Text(
+                              fmtQty(item.quantity),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                          _MiniStepBtn(
+                            icon: Icons.add,
+                            onPressed: onIncrement,
+                          ),
+                        ],
+                      ],
                     ),
                     if (claimBadge != null) ...[
                       const SizedBox(height: 6),
@@ -1039,6 +1827,131 @@ class _OfflineBanner extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _PantrySummaryStrip extends StatelessWidget {
+  const _PantrySummaryStrip({required this.provider});
+
+  final GroceryProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    final toBuy = provider.needsPurchaseCount;
+    final expiringSoon = provider.expiringSoonCount;
+    final expired = provider.expiredCount;
+
+    // Nothing to report — hide the strip entirely.
+    if (toBuy == 0 && expiringSoon == 0 && expired == 0) {
+      return const SizedBox.shrink();
+    }
+
+    final amber = AppTheme.statusColor(GroceryStatus.runningLow);
+    final red = AppTheme.statusColor(GroceryStatus.needsPurchase);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+      child: Row(
+        children: [
+          if (expiringSoon > 0)
+            Expanded(
+              child: _SummaryCard(
+                count: expiringSoon,
+                label: 'Expiring soon',
+                icon: Icons.schedule,
+                color: amber,
+                onTap: () => provider.setFilter(GroceryFilter.expiringSoon),
+              ),
+            ),
+          if (expiringSoon > 0 && (toBuy > 0 || expired > 0))
+            const SizedBox(width: 8),
+          if (toBuy > 0)
+            Expanded(
+              child: _SummaryCard(
+                count: toBuy,
+                label: 'To buy',
+                icon: Icons.shopping_cart_outlined,
+                color: red,
+                onTap: () => provider.setFilter(GroceryFilter.needsPurchase),
+              ),
+            ),
+          if (toBuy > 0 && expired > 0) const SizedBox(width: 8),
+          if (expired > 0)
+            Expanded(
+              child: _SummaryCard(
+                count: expired,
+                label: 'Expired',
+                icon: Icons.error_outline,
+                color: red,
+                onTap: () => provider.setFilter(GroceryFilter.expired),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({
+    required this.count,
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  final int count;
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: color.withValues(alpha: 0.10),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: color),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '$count',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: color,
+                      height: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

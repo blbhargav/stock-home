@@ -14,6 +14,7 @@ class GroceryTile extends StatelessWidget {
     required this.onMarkPurchased,
     required this.onMarkNeedsPurchase,
     required this.onDelete,
+    this.onEdit,
     this.onIncrement,
     this.onDecrement,
   });
@@ -23,6 +24,9 @@ class GroceryTile extends StatelessWidget {
   final VoidCallback onMarkPurchased;
   final VoidCallback onMarkNeedsPurchase;
   final VoidCallback onDelete;
+
+  /// Called by the overflow "Edit" action. Falls back to [onTap] if null.
+  final VoidCallback? onEdit;
 
   /// Optional quantity quick-adjust callbacks. When provided, +/- controls
   /// are shown on the tile.
@@ -51,16 +55,52 @@ class GroceryTile extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child:
-                    Icon(_categoryIcon(item.category), size: 22, color: statusColor),
-              ),
+              item.hasImage
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.network(
+                        item.imageUrl!,
+                        width: 44,
+                        height: 44,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, progress) {
+                          if (progress == null) return child;
+                          return Container(
+                            width: 44,
+                            height: 44,
+                            color: statusColor.withValues(alpha: 0.12),
+                            child: const Center(
+                              child: SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2),
+                              ),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stack) => Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(_categoryIcon(item.category),
+                              size: 22, color: statusColor),
+                        ),
+                      ),
+                    )
+                  : Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(_categoryIcon(item.category),
+                          size: 22, color: statusColor),
+                    ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -101,6 +141,28 @@ class GroceryTile extends StatelessWidget {
                           ),
                       ],
                     ),
+                    if (item.hasNotes) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.sticky_note_2_outlined,
+                              size: 12, color: scheme.onSurfaceVariant),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              item.notes!.trim(),
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                                fontStyle: FontStyle.italic,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     if (item.activityLabel != null) ...[
                       const SizedBox(height: 8),
                       Row(
@@ -137,7 +199,7 @@ class GroceryTile extends StatelessWidget {
                 item: item,
                 onMarkPurchased: onMarkPurchased,
                 onMarkNeedsPurchase: onMarkNeedsPurchase,
-                onEdit: onTap,
+                onEdit: onEdit ?? onTap,
                 onDelete: onDelete,
               ),
             ],

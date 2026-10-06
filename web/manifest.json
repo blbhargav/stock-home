@@ -1,6 +1,6 @@
 {
-    "name": "pantrypal",
-    "short_name": "pantrypal",
+    "name": "stockhome",
+    "short_name": "stockhome",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

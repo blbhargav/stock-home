@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuthException;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
 import 'password_reset_screen.dart';
 
@@ -299,11 +300,14 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Widget _buildModeSwitchFooter(ThemeData theme) {
+    final l10n = AppLocalizations.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          _isRegister ? 'Already have an account?' : 'New to StockHome?',
+          _isRegister
+              ? (l10n?.alreadyHaveAccount ?? 'Already have an account?')
+              : (l10n?.newToApp ?? 'New to StockHome?'),
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -357,7 +361,8 @@ class _Header extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          'Shared home grocery tracker',
+          AppLocalizations.of(context)?.tagline ??
+              'Shared home grocery tracker',
           style: theme.textTheme.bodyLarge?.copyWith(
             color: scheme.onSurfaceVariant,
           ),

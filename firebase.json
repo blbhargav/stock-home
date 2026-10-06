@@ -1,0 +1,28 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "stock-home-pantry",
+          "appId": "1:964520258094:android:3ab277a5f0f2b5d224cdbf",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "stock-home-pantry",
+          "configurations": {
+            "android": "1:964520258094:android:3ab277a5f0f2b5d224cdbf",
+            "ios": "1:964520258094:ios:c3ddce7ec80cf65824cdbf"
+          }
+        }
+      }
+    }
+  }
+}

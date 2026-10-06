@@ -6,9 +6,6 @@ and expiry date; highlights items that are expiring or expired; tracks what
 needs to be purchased; and lets members mark items as purchased — all synced in
 real time across the household.
 
-> Note: the internal Dart package is still named `pantrypal` (unchanged to avoid
-> touching platform build config). "StockHome" is the product/display name.
-
 ## Features
 - Shared households: create one and invite members with a code, or join an existing one.
 - Grocery inventory with category, quantity, and status

@@ -176,4 +176,41 @@ class NotificationService {
     await init();
     await _plugin.cancelAll();
   }
+
+  // Fixed id for the recurring daily digest so it can be updated/cancelled.
+  static const int _digestId = 777001;
+
+  /// Schedules (or replaces) a daily digest notification at 8am summarizing
+  /// how many items are expiring soon. Pass [expiringCount] = 0 to cancel.
+  Future<void> scheduleDailyDigest({required int expiringCount}) async {
+    await init();
+    await _plugin.cancel(id: _digestId);
+    if (expiringCount <= 0) return;
+
+    // Next 8:00am.
+    final now = DateTime.now();
+    var when = DateTime(now.year, now.month, now.day, 8);
+    if (!when.isAfter(now)) {
+      when = when.add(const Duration(days: 1));
+    }
+    final tzTime = tz.TZDateTime.from(when, tz.local);
+    final body = expiringCount == 1
+        ? '1 item is expiring soon. Tap to review.'
+        : '$expiringCount items are expiring soon. Tap to review.';
+
+    try {
+      await _plugin.zonedSchedule(
+        id: _digestId,
+        title: 'StockHome daily check',
+        body: body,
+        scheduledDate: tzTime,
+        notificationDetails: _details,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        // Repeat every day at the same time.
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+    } catch (e) {
+      debugPrint('Failed to schedule daily digest: $e');
+    }
+  }
 }

@@ -1,4 +1,4 @@
-package com.pantrypal.pantrypal
+package com.blb.stockhome
 
 import io.flutter.embedding.android.FlutterActivity
 

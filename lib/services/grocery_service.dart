@@ -71,6 +71,7 @@ class GroceryService {
     final data = <String, dynamic>{
       'status': status.value,
       'updatedBy': updatedBy,
+      'updatedByName': updatedBy,
       'updatedAt': FieldValue.serverTimestamp(),
     };
     if (purchaseDate != null) {

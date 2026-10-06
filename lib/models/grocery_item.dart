@@ -63,9 +63,13 @@ class GroceryItem {
   final DateTime? purchaseDate;
   final DateTime? expiryDate;
   final bool isStaple;
+  final String? notes;
+  final String? imageUrl;
+  final List<String> photos;
   final String? claimedBy;
   final String? claimedByName;
   final String? updatedBy;
+  final String? updatedByName;
   final DateTime? updatedAt;
 
   const GroceryItem({
@@ -78,11 +82,24 @@ class GroceryItem {
     this.purchaseDate,
     this.expiryDate,
     this.isStaple = false,
+    this.notes,
+    this.imageUrl,
+    this.photos = const [],
     this.claimedBy,
     this.claimedByName,
     this.updatedBy,
+    this.updatedByName,
     this.updatedAt,
   });
+
+  /// Whether the item has a non-empty note.
+  bool get hasNotes => notes != null && notes!.trim().isNotEmpty;
+
+  /// Whether the item has a label/card image.
+  bool get hasImage => imageUrl != null && imageUrl!.isNotEmpty;
+
+  /// Maximum number of user reference photos (excluding the label image).
+  static const int maxPhotos = 2;
 
   /// Whether someone has claimed to buy this item.
   bool get isClaimed => claimedBy != null && claimedBy!.isNotEmpty;
@@ -124,9 +141,15 @@ class GroceryItem {
       purchaseDate: (data['purchaseDate'] as Timestamp?)?.toDate(),
       expiryDate: (data['expiryDate'] as Timestamp?)?.toDate(),
       isStaple: (data['isStaple'] as bool?) ?? false,
+      notes: data['notes'] as String?,
+      imageUrl: data['imageUrl'] as String?,
+      photos: ((data['photos'] as List?) ?? const [])
+          .whereType<String>()
+          .toList(growable: false),
       claimedBy: data['claimedBy'] as String?,
       claimedByName: data['claimedByName'] as String?,
       updatedBy: data['updatedBy'] as String?,
+      updatedByName: data['updatedByName'] as String?,
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
     );
   }
@@ -143,9 +166,13 @@ class GroceryItem {
       'expiryDate':
           expiryDate == null ? null : Timestamp.fromDate(expiryDate!),
       'isStaple': isStaple,
+      'notes': notes,
+      'imageUrl': imageUrl,
+      'photos': photos,
       'claimedBy': claimedBy,
       'claimedByName': claimedByName,
       'updatedBy': updatedBy,
+      'updatedByName': updatedByName,
       'updatedAt': FieldValue.serverTimestamp(),
     };
   }
@@ -159,10 +186,16 @@ class GroceryItem {
     DateTime? purchaseDate,
     DateTime? expiryDate,
     bool? isStaple,
+    String? notes,
+    bool clearNotes = false,
+    String? imageUrl,
+    bool clearImage = false,
+    List<String>? photos,
     String? claimedBy,
     String? claimedByName,
     bool clearClaim = false,
     String? updatedBy,
+    String? updatedByName,
   }) {
     return GroceryItem(
       id: id,
@@ -174,9 +207,13 @@ class GroceryItem {
       purchaseDate: purchaseDate ?? this.purchaseDate,
       expiryDate: expiryDate ?? this.expiryDate,
       isStaple: isStaple ?? this.isStaple,
+      notes: clearNotes ? null : (notes ?? this.notes),
+      imageUrl: clearImage ? null : (imageUrl ?? this.imageUrl),
+      photos: photos ?? this.photos,
       claimedBy: clearClaim ? null : (claimedBy ?? this.claimedBy),
       claimedByName: clearClaim ? null : (claimedByName ?? this.claimedByName),
       updatedBy: updatedBy ?? this.updatedBy,
+      updatedByName: updatedByName ?? this.updatedByName,
       updatedAt: updatedAt,
     );
   }
@@ -184,10 +221,15 @@ class GroceryItem {
   /// A short "who did what, when" line, e.g. "Alex · 2h ago".
   /// Returns null if there's nothing to show.
   String? get activityLabel {
-    final who = updatedBy?.trim();
+    // Prefer the explicit display name; fall back to updatedBy, stripping any
+    // email domain so legacy records show just the local part.
+    var who = (updatedByName?.trim().isNotEmpty ?? false)
+        ? updatedByName!.trim()
+        : (updatedBy?.trim() ?? '');
+    if (who.contains('@')) who = who.split('@').first;
     final when = updatedAt;
     final ago = when == null ? null : _relativeTime(when);
-    if (who == null || who.isEmpty) {
+    if (who.isEmpty) {
       return ago;
     }
     return ago == null ? who : '$who · $ago';

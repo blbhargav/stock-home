@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/grocery_item.dart';
+import '../providers/auth_provider.dart';
+import '../providers/grocery_provider.dart';
+import '../providers/locale_provider.dart';
+import '../providers/theme_provider.dart';
 import '../services/notification_service.dart';
 import '../services/settings_service.dart';
 import '../theme/app_theme.dart';
@@ -34,6 +42,8 @@ Future<void> showAccountSheet(
   VoidCallback? onSignOut,
   VoidCallback? onRemindersChanged,
   VoidCallback? onManageMembers,
+  VoidCallback? onInsights,
+  VoidCallback? onActivity,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -49,6 +59,8 @@ Future<void> showAccountSheet(
       onSignOut: onSignOut,
       onRemindersChanged: onRemindersChanged,
       onManageMembers: onManageMembers,
+      onInsights: onInsights,
+      onActivity: onActivity,
     ),
   );
 }
@@ -60,6 +72,8 @@ class _AccountSheet extends StatelessWidget {
     this.onSignOut,
     this.onRemindersChanged,
     this.onManageMembers,
+    this.onInsights,
+    this.onActivity,
   });
 
   final AccountInfo info;
@@ -67,6 +81,8 @@ class _AccountSheet extends StatelessWidget {
   final VoidCallback? onSignOut;
   final VoidCallback? onRemindersChanged;
   final VoidCallback? onManageMembers;
+  final VoidCallback? onInsights;
+  final VoidCallback? onActivity;
 
   /// Copies the household code, closes the sheet, then shows a floating
   /// SnackBar (a SnackBar belongs to the underlying Scaffold and would
@@ -79,6 +95,73 @@ class _AccountSheet extends StatelessWidget {
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(const SnackBar(content: Text('Household code copied')));
+  }
+
+  /// Opens the native share sheet with an invite message containing the code.
+  Future<void> _inviteMembers(BuildContext context) async {
+    final navigator = Navigator.of(context);
+    final message =
+        'Join our household "${info.householdName}" on StockHome!\n\n'
+        'Open the app, tap "Join a household", and enter this code:\n'
+        '${info.householdCode}';
+    navigator.pop();
+    await SharePlus.instance.share(
+      ShareParams(
+        text: message,
+        subject: 'Join ${info.householdName} on StockHome',
+      ),
+    );
+  }
+
+  /// Lets the user export inventory or purchase history as CSV via share.
+  Future<void> _exportData(BuildContext context) async {
+    final provider = context.read<GroceryProvider>();
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.inventory_2_outlined),
+              title: const Text('Inventory (CSV)'),
+              onTap: () => Navigator.pop(ctx, 'inventory'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.receipt_long_outlined),
+              title: const Text('Purchase history (CSV)'),
+              onTap: () => Navigator.pop(ctx, 'purchases'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null) return;
+
+    String csv;
+    String filename;
+    if (choice == 'inventory') {
+      csv = provider.inventoryCsv();
+      filename = 'stockhome_inventory.csv';
+    } else {
+      csv = await provider.purchasesCsv();
+      filename = 'stockhome_purchases.csv';
+    }
+    if (csv.trim().isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Nothing to export yet.')),
+        );
+      }
+      return;
+    }
+    await SharePlus.instance.share(
+      ShareParams(
+        text: csv,
+        subject: filename,
+      ),
+    );
   }
 
   Future<void> _confirmSignOut(BuildContext context) async {
@@ -109,8 +192,76 @@ class _AccountSheet extends StatelessWidget {
   }
 
   void _switchHousehold(BuildContext context) {
-    Navigator.of(context).pop();
-    onSwitchHousehold?.call();
+    // Capture the root navigator before closing this sheet, so we can open
+    // the switcher and navigate afterwards with a valid context.
+    final rootContext = Navigator.of(context, rootNavigator: true).context;
+    final auth = context.read<AuthProvider>();
+    final onNew = onSwitchHousehold;
+    Navigator.of(context).pop(); // close the account sheet
+    _showHouseholdSwitcher(rootContext, auth, onNew);
+  }
+
+  Future<void> _showHouseholdSwitcher(
+    BuildContext context,
+    AuthProvider auth,
+    VoidCallback? onNew,
+  ) async {
+    final memberships = await auth.watchMemberships().first;
+    if (!context.mounted) return;
+    final scheme = Theme.of(context).colorScheme;
+    final result = await showModalBottomSheet<Object>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Your households',
+                  style: Theme.of(ctx).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+            for (final h in memberships)
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: scheme.primaryContainer,
+                  child: const Icon(Icons.home_rounded),
+                ),
+                title: Text(h.name),
+                subtitle: Text(
+                    '${h.memberCount} member${h.memberCount == 1 ? '' : 's'}'),
+                trailing: h.id == auth.householdId
+                    ? Icon(Icons.check_circle, color: scheme.primary)
+                    : null,
+                onTap: () => Navigator.pop(ctx, h.id),
+              ),
+            const Divider(),
+            ListTile(
+              leading: CircleAvatar(
+                backgroundColor: scheme.secondaryContainer,
+                child: const Icon(Icons.add),
+              ),
+              title: const Text('Create or join another household'),
+              onTap: () => Navigator.pop(ctx, 'new'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (result == null) return;
+    if (result == 'new') {
+      onNew?.call(); // routes to HouseholdSetupScreen
+    } else if (result is String && result != auth.householdId) {
+      await auth.switchHousehold(result);
+      // The household-id stream will re-fire, rebinding everything via AppGate.
+    }
   }
 
   @override
@@ -241,10 +392,14 @@ class _AccountSheet extends StatelessWidget {
           const _GroupDivider(),
           _RemindersSection(onChanged: onRemindersChanged),
           const _GroupDivider(),
+          const _ThemeSection(),
+          const _GroupDivider(),
+          const _LanguageSection(),
+          const _GroupDivider(),
           _ActionTile(
             icon: Icons.person_add_alt_1_rounded,
             label: 'Invite members',
-            onTap: () => _copyCode(context),
+            onTap: () => _inviteMembers(context),
           ),
           _ActionTile(
             icon: Icons.group_outlined,
@@ -253,6 +408,27 @@ class _AccountSheet extends StatelessWidget {
               Navigator.of(context).pop();
               onManageMembers?.call();
             },
+          ),
+          _ActionTile(
+            icon: Icons.insights_outlined,
+            label: 'Spending & insights',
+            onTap: () {
+              Navigator.of(context).pop();
+              onInsights?.call();
+            },
+          ),
+          _ActionTile(
+            icon: Icons.history,
+            label: 'Activity',
+            onTap: () {
+              Navigator.of(context).pop();
+              onActivity?.call();
+            },
+          ),
+          _ActionTile(
+            icon: Icons.ios_share,
+            label: 'Export data',
+            onTap: () => _exportData(context),
           ),
           _ActionTile(
             icon: Icons.swap_horiz_rounded,
@@ -269,6 +445,9 @@ class _AccountSheet extends StatelessWidget {
             color: danger,
             onTap: () => _confirmSignOut(context),
           ),
+          const SizedBox(height: 8),
+          const Center(child: _VersionLabel()),
+          const SizedBox(height: 4),
         ],
       ),
     );
@@ -281,6 +460,163 @@ class _AccountSheet extends StatelessWidget {
     final first = parts.first.characters.first;
     if (parts.length == 1) return first.toUpperCase();
     return (first + parts.last.characters.first).toUpperCase();
+  }
+}
+
+class _LanguageSection extends StatelessWidget {
+  const _LanguageSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final localeProvider = context.watch<LocaleProvider>();
+    final current = localeProvider.locale;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          AppLocalizations.of(context)?.language ?? 'LANGUAGE',
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: scheme.onSurfaceVariant,
+            letterSpacing: 1.2,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 4),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(Icons.translate, color: scheme.primary),
+          title: Text(LocaleProvider.labelFor(current)),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _pickLanguage(context),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _pickLanguage(BuildContext context) async {
+    final provider = context.read<LocaleProvider>();
+    final current = provider.locale;
+    // Options: System default (null) + each supported locale.
+    final options = <Locale?>[null, ...LocaleProvider.supported];
+    final chosen = await showModalBottomSheet<Object?>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final loc in options)
+              ListTile(
+                title: Text(LocaleProvider.labelFor(loc)),
+                trailing: (current?.languageCode ?? '') ==
+                        (loc?.languageCode ?? '')
+                    ? Icon(Icons.check,
+                        color: Theme.of(ctx).colorScheme.primary)
+                    : null,
+                onTap: () => Navigator.pop(ctx, loc ?? 'system'),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (chosen == null) return;
+    if (chosen == 'system') {
+      await provider.setLocale(null);
+    } else if (chosen is Locale) {
+      await provider.setLocale(chosen);
+    }
+  }
+}
+
+class _ThemeSection extends StatelessWidget {
+  const _ThemeSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final themeProvider = context.watch<ThemeProvider>();
+    final mode = themeProvider.themeMode;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'APPEARANCE',
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: scheme.onSurfaceVariant,
+            letterSpacing: 1.2,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 10),
+        SegmentedButton<ThemeMode>(
+          segments: const [
+            ButtonSegment(
+              value: ThemeMode.system,
+              icon: Icon(Icons.brightness_auto_outlined),
+              label: Text('System'),
+            ),
+            ButtonSegment(
+              value: ThemeMode.light,
+              icon: Icon(Icons.light_mode_outlined),
+              label: Text('Light'),
+            ),
+            ButtonSegment(
+              value: ThemeMode.dark,
+              icon: Icon(Icons.dark_mode_outlined),
+              label: Text('Dark'),
+            ),
+          ],
+          selected: {mode},
+          showSelectedIcon: false,
+          onSelectionChanged: (s) =>
+              context.read<ThemeProvider>().setThemeMode(s.first),
+        ),
+      ],
+    );
+  }
+}
+
+class _VersionLabel extends StatefulWidget {
+  const _VersionLabel();
+
+  @override
+  State<_VersionLabel> createState() => _VersionLabelState();
+}
+
+class _VersionLabelState extends State<_VersionLabel> {
+  String _version = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() => _version = 'StockHome v${info.version} (${info.buildNumber})');
+      }
+    } catch (_) {
+      // Ignore — just don't show a version.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_version.isEmpty) return const SizedBox(height: 16);
+    return Text(
+      _version,
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+    );
   }
 }
 
