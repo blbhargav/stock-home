@@ -5,7 +5,7 @@ import '../services/settings_service.dart';
 /// Holds the app's selected locale (null = follow system), persisted.
 class LocaleProvider extends ChangeNotifier {
   LocaleProvider({SettingsService? settings})
-      : _settings = settings ?? SettingsService() {
+    : _settings = settings ?? SettingsService() {
     _load();
   }
 
@@ -15,11 +15,7 @@ class LocaleProvider extends ChangeNotifier {
   Locale? get locale => _locale;
 
   /// Supported locales offered in the language picker.
-  static const supported = <Locale>[
-    Locale('en'),
-    Locale('te'),
-    Locale('kn'),
-  ];
+  static const supported = <Locale>[Locale('en'), Locale('te'), Locale('kn')];
 
   static String labelFor(Locale? locale) {
     switch (locale?.languageCode) {

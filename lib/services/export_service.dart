@@ -7,9 +7,7 @@ class ExportService {
 
   String _escape(String value) {
     // Quote fields containing comma, quote or newline; double embedded quotes.
-    if (value.contains(',') ||
-        value.contains('"') ||
-        value.contains('\n')) {
+    if (value.contains(',') || value.contains('"') || value.contains('\n')) {
       return '"${value.replaceAll('"', '""')}"';
     }
     return value;
@@ -27,17 +25,19 @@ class ExportService {
       'Name,Category,Quantity,Unit,Status,Purchase Date,Expiry Date,Staple,Notes',
     ];
     for (final i in items) {
-      rows.add([
-        _escape(i.name),
-        _escape(i.category),
-        _trimQty(i.quantity),
-        _escape(i.unit),
-        _escape(i.status.label),
-        _fmtDate(i.purchaseDate),
-        _fmtDate(i.expiryDate),
-        i.isStaple ? 'Yes' : 'No',
-        _escape(i.notes ?? ''),
-      ].join(','));
+      rows.add(
+        [
+          _escape(i.name),
+          _escape(i.category),
+          _trimQty(i.quantity),
+          _escape(i.unit),
+          _escape(i.status.label),
+          _fmtDate(i.purchaseDate),
+          _fmtDate(i.expiryDate),
+          i.isStaple ? 'Yes' : 'No',
+          _escape(i.notes ?? ''),
+        ].join(','),
+      );
     }
     return rows.join('\n');
   }
@@ -46,13 +46,15 @@ class ExportService {
   String purchasesToCsv(List<PurchaseRecord> purchases) {
     final rows = <String>['Name,Category,Price,Purchased By,Date'];
     for (final p in purchases) {
-      rows.add([
-        _escape(p.name),
-        _escape(p.category),
-        p.price?.toStringAsFixed(2) ?? '',
-        _escape(p.purchasedBy ?? ''),
-        _fmtDate(p.purchasedAt),
-      ].join(','));
+      rows.add(
+        [
+          _escape(p.name),
+          _escape(p.category),
+          p.price?.toStringAsFixed(2) ?? '',
+          _escape(p.purchasedBy ?? ''),
+          _fmtDate(p.purchasedAt),
+        ].join(','),
+      );
     }
     return rows.join('\n');
   }

@@ -102,9 +102,10 @@ class _GroceryFormScreenState extends State<GroceryFormScreen> {
   Future<void> _loadFrequentNames() async {
     try {
       // Pull a broad set once; filtering happens in optionsBuilder.
-      final names = await context
-          .read<GroceryProvider>()
-          .frequentItemNames('', limit: 1000);
+      final names = await context.read<GroceryProvider>().frequentItemNames(
+        '',
+        limit: 1000,
+      );
       if (mounted) setState(() => _frequentNames = names);
     } catch (_) {
       // Non-critical.
@@ -153,7 +154,8 @@ class _GroceryFormScreenState extends State<GroceryFormScreen> {
           setState(() {
             _notesCtrl.text = '$_notesBeforeDictation$text';
             _notesCtrl.selection = TextSelection.collapsed(
-                offset: _notesCtrl.text.length);
+              offset: _notesCtrl.text.length,
+            );
           });
         }
       },
@@ -196,9 +198,7 @@ class _GroceryFormScreenState extends State<GroceryFormScreen> {
           _category = cat;
         }
       });
-      messenger.showSnackBar(
-        SnackBar(content: Text('Found: ${product.name}')),
-      );
+      messenger.showSnackBar(SnackBar(content: Text('Found: ${product.name}')));
     } finally {
       if (mounted) setState(() => _scanning = false);
     }
@@ -219,9 +219,9 @@ class _GroceryFormScreenState extends State<GroceryFormScreen> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not pick image.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Could not pick image.')));
       }
     }
   }
@@ -301,9 +301,9 @@ class _GroceryFormScreenState extends State<GroceryFormScreen> {
       setState(() => _newPhotos.add(File(picked.path)));
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not pick image.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Could not pick image.')));
       }
     }
   }
@@ -369,8 +369,7 @@ class _GroceryFormScreenState extends State<GroceryFormScreen> {
       for (final file in _newPhotos) {
         if (householdId == null) break;
         setState(() => _uploadProgress = 0);
-        final photoId =
-            'photo_${DateTime.now().microsecondsSinceEpoch}';
+        final photoId = 'photo_${DateTime.now().microsecondsSinceEpoch}';
         final url = await _storageService.uploadImage(
           householdId: householdId,
           imageId: photoId,
@@ -495,22 +494,25 @@ class _GroceryFormScreenState extends State<GroceryFormScreen> {
               optionsBuilder: (value) {
                 final query = value.text.trim();
                 if (query.isEmpty) {
-                  return const Iterable<({String name, String category})>.empty();
+                  return const Iterable<
+                    ({String name, String category})
+                  >.empty();
                 }
                 final q = query.toLowerCase();
                 final matches = GrocerySuggestions.search(query);
-                final hasExact = matches.any(
-                  (s) => s.name.toLowerCase() == q,
-                );
+                final hasExact = matches.any((s) => s.name.toLowerCase() == q);
                 // Household's recently/frequently bought names matching query,
                 // excluding any already covered by the static list.
-                final staticNames =
-                    matches.map((s) => s.name.toLowerCase()).toSet();
+                final staticNames = matches
+                    .map((s) => s.name.toLowerCase())
+                    .toSet();
                 final recent = _frequentNames
-                    .where((n) =>
-                        n.toLowerCase().contains(q) &&
-                        !staticNames.contains(n.toLowerCase()) &&
-                        n.toLowerCase() != q)
+                    .where(
+                      (n) =>
+                          n.toLowerCase().contains(q) &&
+                          !staticNames.contains(n.toLowerCase()) &&
+                          n.toLowerCase() != q,
+                    )
                     .take(3)
                     .map((n) => (name: n, category: '__recent__'))
                     .toList();
@@ -533,35 +535,35 @@ class _GroceryFormScreenState extends State<GroceryFormScreen> {
               },
               fieldViewBuilder:
                   (context, controller, focusNode, onFieldSubmitted) {
-                // Capture the Autocomplete's controller so scan/suggestion
-                // updates can write to the visible field. Register the sync
-                // listener only once per controller instance.
-                if (!identical(_nameFieldCtrl, controller)) {
-                  _nameFieldCtrl = controller;
-                  controller.addListener(() {
-                    if (_nameCtrl.text != controller.text) {
-                      _nameCtrl.text = controller.text;
+                    // Capture the Autocomplete's controller so scan/suggestion
+                    // updates can write to the visible field. Register the sync
+                    // listener only once per controller instance.
+                    if (!identical(_nameFieldCtrl, controller)) {
+                      _nameFieldCtrl = controller;
+                      controller.addListener(() {
+                        if (_nameCtrl.text != controller.text) {
+                          _nameCtrl.text = controller.text;
+                        }
+                      });
                     }
-                  });
-                }
-                return TextFormField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  enabled: !_saving,
-                  textCapitalization: TextCapitalization.sentences,
-                  textInputAction: TextInputAction.next,
-                  onFieldSubmitted: (_) {
-                    onFieldSubmitted();
-                    FocusScope.of(context).requestFocus(_qtyFocus);
+                    return TextFormField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      enabled: !_saving,
+                      textCapitalization: TextCapitalization.sentences,
+                      textInputAction: TextInputAction.next,
+                      onFieldSubmitted: (_) {
+                        onFieldSubmitted();
+                        FocusScope.of(context).requestFocus(_qtyFocus);
+                      },
+                      decoration: const InputDecoration(
+                        labelText: 'Name',
+                        hintText: 'e.g. Aloo, Paneer, Chai…',
+                        prefixIcon: Icon(Icons.label_outline),
+                      ),
+                      validator: _validateName,
+                    );
                   },
-                  decoration: const InputDecoration(
-                    labelText: 'Name',
-                    hintText: 'e.g. Aloo, Paneer, Chai…',
-                    prefixIcon: Icon(Icons.label_outline),
-                  ),
-                  validator: _validateName,
-                );
-              },
               optionsViewBuilder: (context, onSelected, options) {
                 final scheme = Theme.of(context).colorScheme;
                 return Align(
@@ -576,8 +578,8 @@ class _GroceryFormScreenState extends State<GroceryFormScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         shrinkWrap: true,
                         itemCount: options.length,
-                        separatorBuilder: (_, _) => Divider(
-                            height: 1, color: scheme.outlineVariant),
+                        separatorBuilder: (_, _) =>
+                            Divider(height: 1, color: scheme.outlineVariant),
                         itemBuilder: (context, index) {
                           final s = options.elementAt(index);
                           final isCustom = s.category.isEmpty;
@@ -586,12 +588,17 @@ class _GroceryFormScreenState extends State<GroceryFormScreen> {
                             onTap: () => onSelected(s),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 12),
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
                               child: Row(
                                 children: [
                                   if (isCustom) ...[
-                                    Icon(Icons.add,
-                                        size: 18, color: scheme.primary),
+                                    Icon(
+                                      Icons.add,
+                                      size: 18,
+                                      color: scheme.primary,
+                                    ),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text.rich(
@@ -601,35 +608,39 @@ class _GroceryFormScreenState extends State<GroceryFormScreen> {
                                             TextSpan(
                                               text: '"${s.name}"',
                                               style: const TextStyle(
-                                                  fontWeight: FontWeight.w700),
+                                                fontWeight: FontWeight.w700,
+                                              ),
                                             ),
                                           ],
                                         ),
-                                        style:
-                                            TextStyle(color: scheme.primary),
+                                        style: TextStyle(color: scheme.primary),
                                       ),
                                     ),
                                   ] else if (isRecent) ...[
-                                    Icon(Icons.history,
-                                        size: 18,
-                                        color: scheme.onSurfaceVariant),
+                                    Icon(
+                                      Icons.history,
+                                      size: 18,
+                                      color: scheme.onSurfaceVariant,
+                                    ),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
                                         s.name,
                                         style: const TextStyle(
-                                            fontWeight: FontWeight.w500),
+                                          fontWeight: FontWeight.w500,
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
                                     Container(
                                       padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 3),
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: scheme.secondaryContainer
                                             .withValues(alpha: 0.6),
-                                        borderRadius:
-                                            BorderRadius.circular(99),
+                                        borderRadius: BorderRadius.circular(99),
                                       ),
                                       child: Text(
                                         'Recent',
@@ -645,18 +656,20 @@ class _GroceryFormScreenState extends State<GroceryFormScreen> {
                                       child: Text(
                                         s.name,
                                         style: const TextStyle(
-                                            fontWeight: FontWeight.w500),
+                                          fontWeight: FontWeight.w500,
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
                                     Container(
                                       padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 3),
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: scheme.primaryContainer
                                             .withValues(alpha: 0.5),
-                                        borderRadius:
-                                            BorderRadius.circular(99),
+                                        borderRadius: BorderRadius.circular(99),
                                       ),
                                       child: Text(
                                         s.category,
@@ -727,8 +740,7 @@ class _GroceryFormScreenState extends State<GroceryFormScreen> {
                     prefixIcon: Icons.scale_outlined,
                     enabled: !_saving,
                     items: GroceryCategories.units
-                        .map((u) =>
-                            DropdownMenuItem(value: u, child: Text(u)))
+                        .map((u) => DropdownMenuItem(value: u, child: Text(u)))
                         .toList(),
                     onChanged: (v) => setState(() => _unit = v!),
                   ),
@@ -769,9 +781,7 @@ class _GroceryFormScreenState extends State<GroceryFormScreen> {
             Card(
               elevation: 0,
               margin: EdgeInsets.zero,
-              color: Theme.of(context)
-                  .colorScheme
-                  .surfaceContainerHighest
+              color: Theme.of(context).colorScheme.surfaceContainerHighest
                   .withValues(alpha: 0.35),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
@@ -782,7 +792,8 @@ class _GroceryFormScreenState extends State<GroceryFormScreen> {
                 secondary: const Icon(Icons.autorenew),
                 title: const Text('Staple item'),
                 subtitle: const Text(
-                    'Automatically added to the shopping list when it runs out'),
+                  'Automatically added to the shopping list when it runs out',
+                ),
               ),
             ),
             const SizedBox(height: 14),
@@ -802,9 +813,7 @@ class _GroceryFormScreenState extends State<GroceryFormScreen> {
                 prefixIcon: const Icon(Icons.sticky_note_2_outlined),
                 alignLabelWithHint: true,
                 suffixIcon: IconButton(
-                  tooltip: _listeningNotes
-                      ? 'Stop dictation'
-                      : 'Dictate notes',
+                  tooltip: _listeningNotes ? 'Stop dictation' : 'Dictate notes',
                   icon: Icon(
                     _listeningNotes ? Icons.stop_circle : Icons.mic_outlined,
                     color: _listeningNotes
@@ -819,8 +828,9 @@ class _GroceryFormScreenState extends State<GroceryFormScreen> {
               currentNote: _notesCtrl.text,
               onSelect: (note) => setState(() {
                 _notesCtrl.text = note;
-                _notesCtrl.selection =
-                    TextSelection.collapsed(offset: note.length);
+                _notesCtrl.selection = TextSelection.collapsed(
+                  offset: note.length,
+                );
               }),
             ),
             const SizedBox(height: 14),
@@ -870,8 +880,8 @@ class _GroceryFormScreenState extends State<GroceryFormScreen> {
               'Add up to ${GroceryItem.maxPhotos} photos — e.g. what it looks '
               'like or where it\'s stored.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 10),
             _UserPhotosRow(
@@ -929,7 +939,8 @@ class _ImagePickerCard extends StatelessWidget {
   final VoidCallback onPick;
   final VoidCallback onRemove;
 
-  bool get _hasImage => pickedImage != null || (imageUrl != null && imageUrl!.isNotEmpty);
+  bool get _hasImage =>
+      pickedImage != null || (imageUrl != null && imageUrl!.isNotEmpty);
 
   @override
   Widget build(BuildContext context) {
@@ -950,8 +961,7 @@ class _ImagePickerCard extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.add_a_photo_outlined,
-                  size: 32, color: scheme.primary),
+              Icon(Icons.add_a_photo_outlined, size: 32, color: scheme.primary),
               const SizedBox(height: 8),
               Text(
                 'Add a photo',
@@ -983,14 +993,15 @@ class _ImagePickerCard extends StatelessWidget {
                       if (progress == null) return child;
                       return Container(
                         color: scheme.surfaceContainerHighest,
-                        child: const Center(
-                            child: CircularProgressIndicator()),
+                        child: const Center(child: CircularProgressIndicator()),
                       );
                     },
                     errorBuilder: (context, error, stack) => Container(
                       color: scheme.surfaceContainerHighest,
-                      child: Icon(Icons.broken_image_outlined,
-                          color: scheme.onSurfaceVariant),
+                      child: Icon(
+                        Icons.broken_image_outlined,
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
           ),
@@ -1121,11 +1132,14 @@ class _UserPhotosRow extends StatelessWidget {
                   children: [
                     Icon(Icons.add_a_photo_outlined, color: scheme.primary),
                     const SizedBox(height: 4),
-                    Text('Add',
-                        style: TextStyle(
-                            color: scheme.primary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600)),
+                    Text(
+                      'Add',
+                      style: TextStyle(
+                        color: scheme.primary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1209,21 +1223,14 @@ class _FullscreenPhoto extends StatelessWidget {
         elevation: 0,
       ),
       body: Center(
-        child: InteractiveViewer(
-          minScale: 1,
-          maxScale: 4,
-          child: image,
-        ),
+        child: InteractiveViewer(minScale: 1, maxScale: 4, child: image),
       ),
     );
   }
 }
 
 class _NoteSuggestions extends StatelessWidget {
-  const _NoteSuggestions({
-    required this.currentNote,
-    required this.onSelect,
-  });
+  const _NoteSuggestions({required this.currentNote, required this.onSelect});
 
   final String currentNote;
   final void Function(String note) onSelect;
@@ -1236,10 +1243,11 @@ class _NoteSuggestions extends StatelessWidget {
     // Filter: exclude exact match (already typed) and optionally filter by
     // prefix if the user has started typing.
     final suggestions = notes
-        .where((n) =>
-            n.trim().toLowerCase() != current &&
-            (current.isEmpty ||
-                n.toLowerCase().contains(current)))
+        .where(
+          (n) =>
+              n.trim().toLowerCase() != current &&
+              (current.isEmpty || n.toLowerCase().contains(current)),
+        )
         .take(5)
         .toList(growable: false);
 
@@ -1254,8 +1262,11 @@ class _NoteSuggestions extends StatelessWidget {
         children: [
           for (final note in suggestions)
             ActionChip(
-              avatar: Icon(Icons.sticky_note_2_outlined,
-                  size: 14, color: scheme.onSurfaceVariant),
+              avatar: Icon(
+                Icons.sticky_note_2_outlined,
+                size: 14,
+                color: scheme.onSurfaceVariant,
+              ),
               label: Text(
                 note.length > 30 ? '${note.substring(0, 30)}…' : note,
                 style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
@@ -1356,13 +1367,14 @@ class _DatePickerTile extends StatelessWidget {
     final Color tileColor = isPast
         ? danger.withValues(alpha: 0.08)
         : scheme.surfaceContainerHighest.withValues(alpha: 0.35);
-    final Color borderColor =
-        isPast ? danger.withValues(alpha: 0.4) : scheme.outlineVariant;
+    final Color borderColor = isPast
+        ? danger.withValues(alpha: 0.4)
+        : scheme.outlineVariant;
     final Color valueColor = isPast
         ? danger
         : isSet
-            ? scheme.onSurface
-            : scheme.onSurfaceVariant;
+        ? scheme.onSurface
+        : scheme.onSurfaceVariant;
 
     return Material(
       color: Colors.transparent,
@@ -1402,8 +1414,9 @@ class _DatePickerTile extends StatelessWidget {
                             : 'Not set',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: valueColor,
-                          fontWeight:
-                              isSet ? FontWeight.w500 : FontWeight.normal,
+                          fontWeight: isSet
+                              ? FontWeight.w500
+                              : FontWeight.normal,
                         ),
                       ),
                     ],
@@ -1415,12 +1428,18 @@ class _DatePickerTile extends StatelessWidget {
                     visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.zero,
                     onPressed: enabled ? onClear : null,
-                    icon: Icon(Icons.close,
-                        size: 18, color: scheme.onSurfaceVariant),
+                    icon: Icon(
+                      Icons.close,
+                      size: 18,
+                      color: scheme.onSurfaceVariant,
+                    ),
                   )
                 else
-                  Icon(Icons.chevron_right,
-                      size: 20, color: scheme.onSurfaceVariant),
+                  Icon(
+                    Icons.chevron_right,
+                    size: 20,
+                    color: scheme.onSurfaceVariant,
+                  ),
               ],
             ),
           ),

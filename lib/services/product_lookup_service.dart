@@ -15,7 +15,7 @@ class ProductInfo {
 /// Open Food Facts is a free, open database. No API key required.
 class ProductLookupService {
   ProductLookupService({http.Client? client})
-      : _client = client ?? http.Client();
+    : _client = client ?? http.Client();
 
   final http.Client _client;
 
@@ -55,10 +55,9 @@ class ProductLookupService {
     );
 
     try {
-      final response = await _client.get(
-        uri,
-        headers: {'User-Agent': 'StockHome/1.0 (grocery tracker)'},
-      ).timeout(const Duration(seconds: 8));
+      final response = await _client
+          .get(uri, headers: {'User-Agent': 'StockHome/1.0 (grocery tracker)'})
+          .timeout(const Duration(seconds: 8));
 
       if (response.statusCode != 200) return null;
       final data = jsonDecode(response.body) as Map<String, dynamic>;

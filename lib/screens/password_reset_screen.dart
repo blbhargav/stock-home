@@ -46,9 +46,9 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
     });
 
     try {
-      await context
-          .read<AuthProvider>()
-          .sendPasswordResetEmail(_emailCtrl.text);
+      await context.read<AuthProvider>().sendPasswordResetEmail(
+        _emailCtrl.text,
+      );
       if (mounted) setState(() => _sent = true);
     } catch (e) {
       if (mounted) setState(() => _error = _friendlyError(e));
@@ -91,22 +91,27 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Icon(Icons.lock_reset,
-                              size: 56, color: scheme.primary),
+                          Icon(
+                            Icons.lock_reset,
+                            size: 56,
+                            color: scheme.primary,
+                          ),
                           const SizedBox(height: 16),
                           Text(
                             'Forgot your password?',
                             textAlign: TextAlign.center,
-                            style: theme.textTheme.headlineSmall
-                                ?.copyWith(fontWeight: FontWeight.bold),
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           Text(
                             'Enter your email and we\'ll send you a link to '
                             'reset your password.',
                             textAlign: TextAlign.center,
-                            style: theme.textTheme.bodyMedium
-                                ?.copyWith(color: scheme.onSurfaceVariant),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
                           ),
                           const SizedBox(height: 24),
                           TextFormField(
@@ -120,7 +125,8 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
                             ),
                             validator: (v) {
                               final value = v?.trim() ?? '';
-                              if (value.isEmpty) return 'Please enter your email';
+                              if (value.isEmpty)
+                                return 'Please enter your email';
                               if (!_emailRegex.hasMatch(value)) {
                                 return 'Enter a valid email address';
                               }
@@ -177,16 +183,18 @@ class _SentView extends StatelessWidget {
         Text(
           'Check your email',
           textAlign: TextAlign.center,
-          style: theme.textTheme.headlineSmall
-              ?.copyWith(fontWeight: FontWeight.bold),
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
         ),
         const SizedBox(height: 8),
         Text(
           'If an account exists for $email, a password reset link is on its '
           'way. Check your inbox and spam folder.',
           textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium
-              ?.copyWith(color: scheme.onSurfaceVariant),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: scheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 24),
         FilledButton(

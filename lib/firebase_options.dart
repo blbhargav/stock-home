@@ -10,8 +10,7 @@
 //
 // That command overwrites this file with your actual configuration.
 
-import 'package:firebase_core/firebase_core.dart'
-    show FirebaseOptions;
+import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
 

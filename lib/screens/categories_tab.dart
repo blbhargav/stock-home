@@ -61,8 +61,9 @@ class CategoriesTab extends StatelessWidget {
           itemBuilder: (context, index) {
             final category = _categories[index];
             final icon = _iconForCategory(category);
-            final categoryItems =
-                items.where((i) => i.category == category).toList();
+            final categoryItems = items
+                .where((i) => i.category == category)
+                .toList();
             final total = categoryItems.length;
             final needsPurchase = categoryItems
                 .where((i) => i.status == GroceryStatus.needsPurchase)
@@ -70,8 +71,7 @@ class CategoriesTab extends StatelessWidget {
             final expiringSoon = categoryItems
                 .where((i) => !i.isExpired && i.expiresWithin(3))
                 .length;
-            final expired =
-                categoryItems.where((i) => i.isExpired).length;
+            final expired = categoryItems.where((i) => i.isExpired).length;
 
             return _CategoryCard(
               category: category,
@@ -82,10 +82,8 @@ class CategoriesTab extends StatelessWidget {
               expired: expired,
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => CategoryItemsScreen(
-                    category: category,
-                    icon: icon,
-                  ),
+                  builder: (_) =>
+                      CategoryItemsScreen(category: category, icon: icon),
                 ),
               ),
             );
@@ -126,10 +124,10 @@ class _CategoryCard extends StatelessWidget {
     final Color? alertColor = expired > 0
         ? AppTheme.statusColor(GroceryStatus.needsPurchase)
         : needsPurchase > 0
-            ? AppTheme.statusColor(GroceryStatus.needsPurchase)
-            : expiringSoon > 0
-                ? AppTheme.statusColor(GroceryStatus.runningLow)
-                : null;
+        ? AppTheme.statusColor(GroceryStatus.needsPurchase)
+        : expiringSoon > 0
+        ? AppTheme.statusColor(GroceryStatus.runningLow)
+        : null;
 
     return Card(
       elevation: 0,
@@ -168,7 +166,9 @@ class _CategoryCard extends StatelessWidget {
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: total == 0
                               ? scheme.surfaceContainerHighest
@@ -196,12 +196,15 @@ class _CategoryCard extends StatelessWidget {
                         const SizedBox(height: 4),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 2),
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: alertColor.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(99),
                             border: Border.all(
-                                color: alertColor.withValues(alpha: 0.4)),
+                              color: alertColor.withValues(alpha: 0.4),
+                            ),
                           ),
                           child: Text(
                             _alertLabel(),

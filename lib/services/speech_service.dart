@@ -28,9 +28,7 @@ class SpeechService {
 
   /// Starts listening. [onResult] is called with the (possibly partial)
   /// recognized text as the user speaks.
-  Future<void> listen({
-    required void Function(String text) onResult,
-  }) async {
+  Future<void> listen({required void Function(String text) onResult}) async {
     if (!_available) {
       final ok = await init();
       if (!ok) return;

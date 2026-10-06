@@ -35,8 +35,9 @@ class _RecipeImportScreenState extends State<RecipeImportScreen> {
 
   void _analyze() {
     final ingredients = _parseIngredients(_controller.text);
-    final result =
-        context.read<GroceryProvider>().matchIngredients(ingredients);
+    final result = context.read<GroceryProvider>().matchIngredients(
+      ingredients,
+    );
     setState(() {
       _inStock = result.inStock;
       _missing = result.missing;
@@ -50,17 +51,20 @@ class _RecipeImportScreenState extends State<RecipeImportScreen> {
   Future<void> _addSelected() async {
     final who = context.read<AuthProvider>().resolvedDisplayName;
     final toAdd = _selectedMissing.toList();
-    await context
-        .read<GroceryProvider>()
-        .addIngredientsToList(toAdd, updatedBy: who);
+    await context.read<GroceryProvider>().addIngredientsToList(
+      toAdd,
+      updatedBy: who,
+    );
     if (mounted) {
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text('${toAdd.length} ingredients added to shopping list'),
-        ));
+        ..showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text('${toAdd.length} ingredients added to shopping list'),
+          ),
+        );
     }
   }
 
@@ -84,8 +88,7 @@ class _RecipeImportScreenState extends State<RecipeImportScreen> {
               textCapitalization: TextCapitalization.sentences,
               decoration: const InputDecoration(
                 labelText: 'Paste recipe ingredients',
-                hintText:
-                    '2 cups rice\n1 onion\n3 tomatoes\n1 tbsp oil\nsalt',
+                hintText: '2 cups rice\n1 onion\n3 tomatoes\n1 tbsp oil\nsalt',
                 border: OutlineInputBorder(),
                 alignLabelWithHint: true,
               ),
@@ -96,8 +99,7 @@ class _RecipeImportScreenState extends State<RecipeImportScreen> {
             child: SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed:
-                    _controller.text.trim().isEmpty ? null : _analyze,
+                onPressed: _controller.text.trim().isEmpty ? null : _analyze,
                 icon: const Icon(Icons.search),
                 label: const Text('Check against inventory'),
               ),
@@ -159,8 +161,9 @@ class _RecipeImportScreenState extends State<RecipeImportScreen> {
                       child: Text(
                         'No ingredients recognised. Try one per line.',
                         textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(color: scheme.onSurfaceVariant),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
                 ],
@@ -176,7 +179,8 @@ class _RecipeImportScreenState extends State<RecipeImportScreen> {
                   onPressed: _selectedMissing.isEmpty ? null : _addSelected,
                   icon: const Icon(Icons.add_shopping_cart),
                   label: Text(
-                      'Add ${_selectedMissing.length} to shopping list'),
+                    'Add ${_selectedMissing.length} to shopping list',
+                  ),
                 ),
               ),
             )

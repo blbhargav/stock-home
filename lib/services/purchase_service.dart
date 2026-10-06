@@ -7,7 +7,7 @@ import '../models/purchase_record.dart';
 /// Firestore layout: households/{householdId}/purchases/{purchaseId}
 class PurchaseService {
   PurchaseService({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 
@@ -31,8 +31,10 @@ class PurchaseService {
         .orderBy('purchasedAt', descending: true)
         .limit(limit)
         .snapshots()
-        .map((snap) =>
-            snap.docs.map(PurchaseRecord.fromDoc).toList(growable: false));
+        .map(
+          (snap) =>
+              snap.docs.map(PurchaseRecord.fromDoc).toList(growable: false),
+        );
   }
 
   /// One-shot fetch of purchases for computing frequency/spend.

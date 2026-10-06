@@ -4,7 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 /// IDs + active id, migrating a legacy single `householdId` into list form.
 /// Extracted as a top-level function so it can be unit-tested without Firestore.
 ({List<String> ids, String? active}) parseUserHouseholds(
-    Map<String, dynamic>? data) {
+  Map<String, dynamic>? data,
+) {
   if (data == null) return (ids: const [], active: null);
   final ids = ((data['householdIds'] as List?) ?? const [])
       .whereType<String>()
@@ -19,7 +20,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
   }
   return (ids: ids, active: active);
 }
-
 
 /// Basic household details for display (name + member count).
 class HouseholdInfo {
@@ -59,14 +59,13 @@ class HouseholdMember {
 ///   households/{id}  -> { name, members: [uid...], createdAt }
 class HouseholdService {
   HouseholdService({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 
   /// Reads the user's household IDs + active id, migrating the legacy single
   /// `householdId` field into the list form when needed.
-  ({List<String> ids, String? active}) _parseUser(
-          Map<String, dynamic>? data) =>
+  ({List<String> ids, String? active}) _parseUser(Map<String, dynamic>? data) =>
       parseUserHouseholds(data);
 
   /// Returns the display name stored in the user's Firestore profile, or null.
@@ -96,9 +95,8 @@ class HouseholdService {
       for (final id in candidates) {
         try {
           final household = await _db.collection('households').doc(id).get();
-          final members =
-              ((household.data()?['members'] as List?) ?? const [])
-                  .whereType<String>();
+          final members = ((household.data()?['members'] as List?) ?? const [])
+              .whereType<String>();
           if (members.contains(uid)) return id;
         } catch (_) {
           // Can't verify (offline) — accept the active candidate.
@@ -152,13 +150,15 @@ class HouseholdService {
               .whereType<String>()
               .toList();
           if (!members.contains(uid)) continue; // removed elsewhere
-          result.add(HouseholdInfo(
-            id: id,
-            name: (data['name'] ?? 'Household') as String,
-            memberCount: members.length,
-            ownerId: members.isNotEmpty ? members.first : null,
-            memberIds: members,
-          ));
+          result.add(
+            HouseholdInfo(
+              id: id,
+              name: (data['name'] ?? 'Household') as String,
+              memberCount: members.length,
+              ownerId: members.isNotEmpty ? members.first : null,
+              memberIds: members,
+            ),
+          );
         } catch (_) {
           // skip unreadable
         }
@@ -180,11 +180,7 @@ class HouseholdService {
 
   /// Real-time stream of a household's display info (name + member count).
   Stream<HouseholdInfo?> watchHousehold(String householdId) {
-    return _db
-        .collection('households')
-        .doc(householdId)
-        .snapshots()
-        .map((doc) {
+    return _db.collection('households').doc(householdId).snapshots().map((doc) {
       final data = doc.data();
       if (data == null) return null;
       final members = ((data['members'] as List?) ?? const [])
@@ -221,11 +217,9 @@ class HouseholdService {
       } catch (_) {
         // Fall back to generic label.
       }
-      members.add(HouseholdMember(
-        uid: uid,
-        name: name,
-        isOwner: uid == ownerId,
-      ));
+      members.add(
+        HouseholdMember(uid: uid, name: name, isOwner: uid == ownerId),
+      );
     }
     return members;
   }

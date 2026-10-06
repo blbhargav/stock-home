@@ -45,16 +45,20 @@ class ActivityFeedScreen extends StatelessWidget {
                   children: [
                     Icon(Icons.history, size: 64, color: scheme.primary),
                     const SizedBox(height: 16),
-                    Text('No activity yet',
-                        style: theme.textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w700)),
+                    Text(
+                      'No activity yet',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     Text(
                       'When household members buy items, their activity shows '
                       'up here.',
                       textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium
-                          ?.copyWith(color: scheme.onSurfaceVariant),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -94,8 +98,9 @@ class ActivityFeedScreen extends StatelessWidget {
                 subtitle: Text(p.category),
                 trailing: Text(
                   _relativeTime(p.purchasedAt),
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: scheme.onSurfaceVariant),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
               );
             },

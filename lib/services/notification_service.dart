@@ -28,8 +28,7 @@ class NotificationService {
 
     tz.initializeTimeZones();
 
-    const androidInit =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const darwinInit = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
@@ -50,15 +49,19 @@ class NotificationService {
   Future<bool> requestPermissions() async {
     await init();
 
-    final android = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     if (android != null) {
       final granted = await android.requestNotificationsPermission();
       return granted ?? true;
     }
 
-    final ios = _plugin.resolvePlatformSpecificImplementation<
-        IOSFlutterLocalNotificationsPlugin>();
+    final ios = _plugin
+        .resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin
+        >();
     if (ios != null) {
       final granted = await ios.requestPermissions(
         alert: true,
@@ -76,19 +79,20 @@ class NotificationService {
 
   /// Separate id for the "expires today" reminder so it can coexist with the
   /// "N days before" one.
-  int _todayIdFor(String groceryId) => (groceryId.hashCode ^ 0x5a5a5a5a) & 0x7fffffff;
+  int _todayIdFor(String groceryId) =>
+      (groceryId.hashCode ^ 0x5a5a5a5a) & 0x7fffffff;
 
   NotificationDetails get _details => const NotificationDetails(
-        android: AndroidNotificationDetails(
-          _channelId,
-          _channelName,
-          channelDescription: _channelDescription,
-          importance: Importance.high,
-          priority: Priority.high,
-        ),
-        iOS: DarwinNotificationDetails(),
-        macOS: DarwinNotificationDetails(),
-      );
+    android: AndroidNotificationDetails(
+      _channelId,
+      _channelName,
+      channelDescription: _channelDescription,
+      importance: Importance.high,
+      priority: Priority.high,
+    ),
+    iOS: DarwinNotificationDetails(),
+    macOS: DarwinNotificationDetails(),
+  );
 
   /// Schedules (or reschedules) a reminder for an item. Cancels any existing
   /// one first. If the reminder time is in the past, nothing is scheduled.

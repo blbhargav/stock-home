@@ -32,15 +32,21 @@ class InsightsScreen extends StatelessWidget {
           final now = DateTime.now();
           final monthStart = DateTime(now.year, now.month);
           final thisMonth = purchases
-              .where((p) =>
-                  p.purchasedAt != null &&
-                  !p.purchasedAt!.isBefore(monthStart))
+              .where(
+                (p) =>
+                    p.purchasedAt != null &&
+                    !p.purchasedAt!.isBefore(monthStart),
+              )
               .toList();
 
           final monthSpend = thisMonth.fold<double>(
-              0, (sum, p) => sum + (p.price ?? 0));
-          final totalSpend =
-              purchases.fold<double>(0, (sum, p) => sum + (p.price ?? 0));
+            0,
+            (sum, p) => sum + (p.price ?? 0),
+          );
+          final totalSpend = purchases.fold<double>(
+            0,
+            (sum, p) => sum + (p.price ?? 0),
+          );
 
           // Most-bought items (by count).
           final counts = <String, int>{};
@@ -83,8 +89,9 @@ class InsightsScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(8),
                 child: Text(
                   'Spend totals only count purchases where a price was entered.',
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: scheme.onSurfaceVariant),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -107,7 +114,9 @@ class InsightsScreen extends StatelessWidget {
                     child: Text('$count'),
                   ),
                   title: Text(name),
-                  subtitle: Text(count == 1 ? 'Bought once' : 'Bought $count times'),
+                  subtitle: Text(
+                    count == 1 ? 'Bought once' : 'Bought $count times',
+                  ),
                 );
               }),
             ],
@@ -128,16 +137,20 @@ class InsightsScreen extends StatelessWidget {
           children: [
             Icon(Icons.insights_outlined, size: 64, color: scheme.primary),
             const SizedBox(height: 16),
-            Text('No purchases yet',
-                style: theme.textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w700)),
+            Text(
+              'No purchases yet',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 8),
             Text(
               'Mark items as purchased (and optionally add a price) to see '
               'spending and your most-bought items here.',
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: scheme.onSurfaceVariant),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -176,13 +189,21 @@ class _StatCard extends StatelessWidget {
         children: [
           Icon(icon, color: color),
           const SizedBox(height: 10),
-          Text(label,
-              style: theme.textTheme.labelSmall
-                  ?.copyWith(color: color, fontWeight: FontWeight.w600)),
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 2),
-          Text(value,
-              style: theme.textTheme.headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.w800, color: color)),
+          Text(
+            value,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
           const SizedBox(height: 2),
           Text(sub, style: theme.textTheme.bodySmall),
         ],

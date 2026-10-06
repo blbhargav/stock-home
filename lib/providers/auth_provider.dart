@@ -8,11 +8,9 @@ import '../services/household_service.dart';
 
 /// Exposes authentication state and the user's linked household to the UI.
 class AuthProvider extends ChangeNotifier {
-  AuthProvider({
-    AuthService? authService,
-    HouseholdService? householdService,
-  })  : _authService = authService ?? AuthService(),
-        _householdService = householdService ?? HouseholdService() {
+  AuthProvider({AuthService? authService, HouseholdService? householdService})
+    : _authService = authService ?? AuthService(),
+      _householdService = householdService ?? HouseholdService() {
     _authSub = _authService.authStateChanges().listen(_onAuthChanged);
   }
 
@@ -24,7 +22,8 @@ class AuthProvider extends ChangeNotifier {
 
   User? _user;
   String? _householdId;
-  String? _firestoreName; // name stored in users/{uid}, fallback for displayName
+  String?
+  _firestoreName; // name stored in users/{uid}, fallback for displayName
   bool _initialized = false;
 
   User? get user => _user;
@@ -58,8 +57,7 @@ class AuthProvider extends ChangeNotifier {
       // Repair any lost household memberships from legacy migration.
       _householdService.repairMemberships(user.uid);
       // Watch the user's Firestore profile for householdId and stored name.
-      _householdSub =
-          _householdService.watchHouseholdId(user.uid).listen((id) {
+      _householdSub = _householdService.watchHouseholdId(user.uid).listen((id) {
         _householdId = id;
         _initialized = true;
         notifyListeners();
@@ -112,7 +110,8 @@ class AuthProvider extends ChangeNotifier {
   }
 
   /// Whether the current user is the household owner (its creator).
-  bool get isHouseholdOwner => _householdOwnerId != null && _householdOwnerId == _user?.uid;
+  bool get isHouseholdOwner =>
+      _householdOwnerId != null && _householdOwnerId == _user?.uid;
   String? _householdOwnerId;
 
   Future<List<HouseholdMember>> getMembers() async {
@@ -127,10 +126,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> removeMember(String memberUid) async {
     final id = _householdId;
     if (id == null) return;
-    await _householdService.removeMember(
-      householdId: id,
-      memberUid: memberUid,
-    );
+    await _householdService.removeMember(householdId: id, memberUid: memberUid);
   }
 
   /// Leaves the current household so the user can create or join another.

@@ -1,12 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Lifecycle status of a grocery item within the household.
-enum GroceryStatus {
-  inStock,
-  runningLow,
-  needsPurchase,
-  purchased,
-}
+enum GroceryStatus { inStock, runningLow, needsPurchase, purchased }
 
 extension GroceryStatusX on GroceryStatus {
   /// Value persisted to Firestore.
@@ -161,10 +156,10 @@ class GroceryItem {
       'quantity': quantity,
       'unit': unit,
       'status': status.value,
-      'purchaseDate':
-          purchaseDate == null ? null : Timestamp.fromDate(purchaseDate!),
-      'expiryDate':
-          expiryDate == null ? null : Timestamp.fromDate(expiryDate!),
+      'purchaseDate': purchaseDate == null
+          ? null
+          : Timestamp.fromDate(purchaseDate!),
+      'expiryDate': expiryDate == null ? null : Timestamp.fromDate(expiryDate!),
       'isStaple': isStaple,
       'notes': notes,
       'imageUrl': imageUrl,

@@ -5,7 +5,7 @@ import '../services/settings_service.dart';
 /// Holds the app's theme mode (system / light / dark), persisted to settings.
 class ThemeProvider extends ChangeNotifier {
   ThemeProvider({SettingsService? settings})
-      : _settings = settings ?? SettingsService() {
+    : _settings = settings ?? SettingsService() {
     _load();
   }
 

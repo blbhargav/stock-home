@@ -76,10 +76,10 @@ class GroceryProvider extends ChangeNotifier {
     NotificationService? notifications,
     SettingsService? settings,
     PurchaseService? purchases,
-  })  : _service = service ?? GroceryService(),
-        _notifications = notifications ?? NotificationService.instance,
-        _settings = settings ?? SettingsService(),
-        _purchases = purchases ?? PurchaseService() {
+  }) : _service = service ?? GroceryService(),
+       _notifications = notifications ?? NotificationService.instance,
+       _settings = settings ?? SettingsService(),
+       _purchases = purchases ?? PurchaseService() {
     _loadPreferences();
   }
 
@@ -88,11 +88,11 @@ class GroceryProvider extends ChangeNotifier {
       final sortIndex = await _settings.getSortIndex();
       final group = await _settings.getGroupByCategory();
       final shoppingSortIndex = await _settings.getShoppingSortIndex();
-      _sort = GrocerySort.values[
-          sortIndex.clamp(0, GrocerySort.values.length - 1)];
+      _sort =
+          GrocerySort.values[sortIndex.clamp(0, GrocerySort.values.length - 1)];
       _groupByCategory = group;
-      _shoppingSort = ShoppingSort.values[
-          shoppingSortIndex.clamp(0, ShoppingSort.values.length - 1)];
+      _shoppingSort = ShoppingSort
+          .values[shoppingSortIndex.clamp(0, ShoppingSort.values.length - 1)];
       notifyListeners();
     } catch (_) {
       // Ignore; defaults are fine.
@@ -132,6 +132,7 @@ class GroceryProvider extends ChangeNotifier {
       ..sort((a, b) => counts[b]!.compareTo(counts[a]!));
     return sorted;
   }
+
   bool get loading => _loading;
 
   /// True when data is being served from the local cache (offline).
@@ -151,8 +152,7 @@ class GroceryProvider extends ChangeNotifier {
       _items.where((i) => i.status == GroceryStatus.needsPurchase).length;
 
   /// Number of items expiring within 3 days (and not yet expired).
-  int get expiringSoonCount =>
-      _items.where((i) => i.expiresWithin(3)).length;
+  int get expiringSoonCount => _items.where((i) => i.expiresWithin(3)).length;
 
   /// Number of already expired items.
   int get expiredCount => _items.where((i) => i.isExpired).length;
@@ -165,9 +165,11 @@ class GroceryProvider extends ChangeNotifier {
       case GroceryFilter.all:
         break;
       case GroceryFilter.inStock:
-        result = result.where((i) =>
-            i.status == GroceryStatus.inStock ||
-            i.status == GroceryStatus.runningLow);
+        result = result.where(
+          (i) =>
+              i.status == GroceryStatus.inStock ||
+              i.status == GroceryStatus.runningLow,
+        );
         break;
       case GroceryFilter.needsPurchase:
         result = result.where((i) => i.status == GroceryStatus.needsPurchase);
@@ -182,9 +184,11 @@ class GroceryProvider extends ChangeNotifier {
 
     if (_search.isNotEmpty) {
       final q = _search.toLowerCase();
-      result = result.where((i) =>
-          i.name.toLowerCase().contains(q) ||
-          i.category.toLowerCase().contains(q));
+      result = result.where(
+        (i) =>
+            i.name.toLowerCase().contains(q) ||
+            i.category.toLowerCase().contains(q),
+      );
     }
 
     final list = result.toList();
@@ -195,8 +199,9 @@ class GroceryProvider extends ChangeNotifier {
   void _applySort(List<GroceryItem> list) {
     switch (_sort) {
       case GrocerySort.name:
-        list.sort((a, b) =>
-            a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        list.sort(
+          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        );
         break;
       case GrocerySort.expiry:
         // Items without an expiry date sort to the end.
@@ -246,14 +251,17 @@ class GroceryProvider extends ChangeNotifier {
   /// sorted by the active shopping sort.
   List<GroceryItem> get shoppingList {
     final list = _items
-        .where((i) =>
-            i.status == GroceryStatus.needsPurchase ||
-            i.status == GroceryStatus.purchased)
+        .where(
+          (i) =>
+              i.status == GroceryStatus.needsPurchase ||
+              i.status == GroceryStatus.purchased,
+        )
         .toList();
     switch (_shoppingSort) {
       case ShoppingSort.name:
-        list.sort((a, b) =>
-            a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        list.sort(
+          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        );
         break;
       case ShoppingSort.category:
         list.sort((a, b) {
@@ -440,8 +448,11 @@ class GroceryProvider extends ChangeNotifier {
     return _service.updateGrocery(id, item);
   }
 
-  Future<void> markPurchased(GroceryItem item,
-      {String? updatedBy, double? price}) async {
+  Future<void> markPurchased(
+    GroceryItem item, {
+    String? updatedBy,
+    double? price,
+  }) async {
     final id = _householdId;
     if (id == null) return;
     await _service.updateStatus(
@@ -456,8 +467,11 @@ class GroceryProvider extends ChangeNotifier {
   }
 
   /// Logs a purchase event to the household's purchase history.
-  Future<void> _logPurchase(GroceryItem item,
-      {String? updatedBy, double? price}) async {
+  Future<void> _logPurchase(
+    GroceryItem item, {
+    String? updatedBy,
+    double? price,
+  }) async {
     final id = _householdId;
     if (id == null) return;
     try {
@@ -477,28 +491,21 @@ class GroceryProvider extends ChangeNotifier {
   }
 
   /// Claims an item so other members know someone is buying it.
-  Future<void> claimItem(GroceryItem item,
-      {required String? uid, required String? name}) {
+  Future<void> claimItem(
+    GroceryItem item, {
+    required String? uid,
+    required String? name,
+  }) {
     final id = _householdId;
     if (id == null) return Future.value();
-    return _service.setClaim(
-      id,
-      item.id,
-      claimedBy: uid,
-      claimedByName: name,
-    );
+    return _service.setClaim(id, item.id, claimedBy: uid, claimedByName: name);
   }
 
   /// Releases a claim on an item.
   Future<void> unclaimItem(GroceryItem item) {
     final id = _householdId;
     if (id == null) return Future.value();
-    return _service.setClaim(
-      id,
-      item.id,
-      claimedBy: null,
-      claimedByName: null,
-    );
+    return _service.setClaim(id, item.id, claimedBy: null, claimedByName: null);
   }
 
   Future<void> markNeedsPurchase(GroceryItem item, {String? updatedBy}) {
@@ -513,8 +520,11 @@ class GroceryProvider extends ChangeNotifier {
   }
 
   /// Marks a shopping-list item as purchased (kept visible in the cart section).
-  Future<void> markInCart(GroceryItem item,
-      {String? updatedBy, double? price}) async {
+  Future<void> markInCart(
+    GroceryItem item, {
+    String? updatedBy,
+    double? price,
+  }) async {
     final id = _householdId;
     if (id == null) return;
     await _service.updateStatus(
@@ -548,13 +558,17 @@ class GroceryProvider extends ChangeNotifier {
         .where((i) => i.status == GroceryStatus.needsPurchase)
         .toList(growable: false);
     final now = DateTime.now();
-    await Future.wait(pending.map((item) => _service.updateStatus(
+    await Future.wait(
+      pending.map(
+        (item) => _service.updateStatus(
           id,
           item.id,
           GroceryStatus.purchased,
           updatedBy: updatedBy,
           purchaseDate: now,
-        )));
+        ),
+      ),
+    );
     // Log each as a purchase (no price for bulk mark-all).
     for (final item in pending) {
       await _logPurchase(item, updatedBy: updatedBy);
@@ -612,11 +626,14 @@ class GroceryProvider extends ChangeNotifier {
   /// (status inStock/runningLow) and which are missing. Case-insensitive,
   /// matches if an inventory item name contains the ingredient or vice versa.
   ({List<String> inStock, List<String> missing}) matchIngredients(
-      List<String> ingredients) {
+    List<String> ingredients,
+  ) {
     final stockNames = _items
-        .where((i) =>
-            i.status == GroceryStatus.inStock ||
-            i.status == GroceryStatus.runningLow)
+        .where(
+          (i) =>
+              i.status == GroceryStatus.inStock ||
+              i.status == GroceryStatus.runningLow,
+        )
         .map((i) => i.name)
         .toList();
     return matchIngredientNames(ingredients, stockNames);
@@ -644,7 +661,7 @@ class GroceryProvider extends ChangeNotifier {
   /// recent known price per item name from purchase history. Returns null if
   /// no prices are known. Also reports how many items had a known price.
   Future<({double total, int priced, int totalItems})?>
-      estimateShoppingTotal() async {
+  estimateShoppingTotal() async {
     final id = _householdId;
     if (id == null) return null;
     final toBuy = _items
@@ -698,9 +715,11 @@ class GroceryProvider extends ChangeNotifier {
 
       // Names already needing purchase / on the list — don't re-suggest.
       final onList = _items
-          .where((i) =>
-              i.status == GroceryStatus.needsPurchase ||
-              i.status == GroceryStatus.purchased)
+          .where(
+            (i) =>
+                i.status == GroceryStatus.needsPurchase ||
+                i.status == GroceryStatus.purchased,
+          )
           .map((i) => i.name.toLowerCase())
           .toSet();
 
@@ -720,12 +739,14 @@ class GroceryProvider extends ChangeNotifier {
         if (avgInterval <= 0) return;
         final daysSinceLast = now.difference(dates.last).inDays;
         if (daysSinceLast >= avgInterval) {
-          suggestions.add(LowStockSuggestion(
-            name: name,
-            avgIntervalDays: avgInterval.round(),
-            daysSinceLast: daysSinceLast,
-            overdueBy: (daysSinceLast - avgInterval).round(),
-          ));
+          suggestions.add(
+            LowStockSuggestion(
+              name: name,
+              avgIntervalDays: avgInterval.round(),
+              daysSinceLast: daysSinceLast,
+              overdueBy: (daysSinceLast - avgInterval).round(),
+            ),
+          );
         }
       });
 
@@ -800,12 +821,16 @@ class GroceryProvider extends ChangeNotifier {
   }) async {
     final id = _householdId;
     if (id == null) return;
-    await Future.wait(items.map((i) => _service.updateStatus(
+    await Future.wait(
+      items.map(
+        (i) => _service.updateStatus(
           id,
           i.id,
           GroceryStatus.needsPurchase,
           updatedBy: updatedBy,
-        )));
+        ),
+      ),
+    );
   }
 
   /// Changes the category of multiple items at once.
@@ -816,13 +841,18 @@ class GroceryProvider extends ChangeNotifier {
   }) async {
     final id = _householdId;
     if (id == null) return;
-    await Future.wait(items.map((i) => _service.updateGrocery(
+    await Future.wait(
+      items.map(
+        (i) => _service.updateGrocery(
           id,
           i.copyWith(
-              category: category,
-              updatedBy: updatedBy,
-              updatedByName: updatedBy),
-        )));
+            category: category,
+            updatedBy: updatedBy,
+            updatedByName: updatedBy,
+          ),
+        ),
+      ),
+    );
   }
 
   /// Adjusts an item's quantity by [delta] (clamped at 0). When the quantity

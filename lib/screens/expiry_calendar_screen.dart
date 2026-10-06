@@ -54,10 +54,8 @@ class _ExpiryCalendarScreenState extends State<ExpiryCalendarScreen> {
               Card(
                 margin: const EdgeInsets.all(12),
                 child: TableCalendar<GroceryItem>(
-                  firstDay: DateTime.now()
-                      .subtract(const Duration(days: 365)),
-                  lastDay:
-                      DateTime.now().add(const Duration(days: 365 * 2)),
+                  firstDay: DateTime.now().subtract(const Duration(days: 365)),
+                  lastDay: DateTime.now().add(const Duration(days: 365 * 2)),
                   focusedDay: _focusedDay,
                   selectedDayPredicate: (d) =>
                       _selectedDay != null && isSameDay(_selectedDay, d),
@@ -102,8 +100,9 @@ class _ExpiryCalendarScreenState extends State<ExpiryCalendarScreen> {
                           child: Text(
                             'Nothing expiring on\n${DateFormat.yMMMMd().format(selected)}',
                             textAlign: TextAlign.center,
-                            style: theme.textTheme.bodyMedium
-                                ?.copyWith(color: scheme.onSurfaceVariant),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
                           ),
                         ),
                       )
@@ -113,19 +112,24 @@ class _ExpiryCalendarScreenState extends State<ExpiryCalendarScreen> {
                           final item = dayItems[index];
                           final color = item.isExpired
                               ? AppTheme.statusColor(
-                                  GroceryStatus.needsPurchase)
-                              : AppTheme.statusColor(
-                                  GroceryStatus.runningLow);
+                                  GroceryStatus.needsPurchase,
+                                )
+                              : AppTheme.statusColor(GroceryStatus.runningLow);
                           return ListTile(
-                            leading: Icon(Icons.event_busy_outlined,
-                                color: color),
+                            leading: Icon(
+                              Icons.event_busy_outlined,
+                              color: color,
+                            ),
                             title: Text(item.name),
                             subtitle: Text(
-                                '${_trimQty(item.quantity)} ${item.unit} · ${item.category}'),
+                              '${_trimQty(item.quantity)} ${item.unit} · ${item.category}',
+                            ),
                             trailing: Text(
                               item.isExpired ? 'Expired' : 'Expires',
                               style: TextStyle(
-                                  color: color, fontWeight: FontWeight.w600),
+                                color: color,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             onTap: () => Navigator.of(context).push(
                               MaterialPageRoute(

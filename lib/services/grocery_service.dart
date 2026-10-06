@@ -26,7 +26,7 @@ class GrocerySnapshot {
 ///   households/{householdId}/groceries/{groceryId}
 class GroceryService {
   GroceryService({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 
@@ -43,13 +43,15 @@ class GroceryService {
     return _groceries(householdId)
         .orderBy('name')
         .snapshots(includeMetadataChanges: true)
-        .map((snapshot) => GrocerySnapshot(
-              items: snapshot.docs
-                  .map(GroceryItem.fromDoc)
-                  .toList(growable: false),
-              isFromCache: snapshot.metadata.isFromCache,
-              hasPendingWrites: snapshot.metadata.hasPendingWrites,
-            ));
+        .map(
+          (snapshot) => GrocerySnapshot(
+            items: snapshot.docs
+                .map(GroceryItem.fromDoc)
+                .toList(growable: false),
+            isFromCache: snapshot.metadata.isFromCache,
+            hasPendingWrites: snapshot.metadata.hasPendingWrites,
+          ),
+        );
   }
 
   Future<void> addGrocery(String householdId, GroceryItem item) {

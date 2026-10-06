@@ -3,11 +3,41 @@
 library;
 
 const _unitWords = {
-  'cup', 'cups', 'tbsp', 'tsp', 'tablespoon', 'tablespoons',
-  'teaspoon', 'teaspoons', 'g', 'kg', 'gram', 'grams', 'ml', 'l',
-  'litre', 'litres', 'liter', 'liters', 'pinch', 'oz', 'lb', 'lbs',
-  'piece', 'pieces', 'pcs', 'clove', 'cloves', 'can', 'cans',
-  'packet', 'packets', 'pack', 'slice', 'slices', 'bunch',
+  'cup',
+  'cups',
+  'tbsp',
+  'tsp',
+  'tablespoon',
+  'tablespoons',
+  'teaspoon',
+  'teaspoons',
+  'g',
+  'kg',
+  'gram',
+  'grams',
+  'ml',
+  'l',
+  'litre',
+  'litres',
+  'liter',
+  'liters',
+  'pinch',
+  'oz',
+  'lb',
+  'lbs',
+  'piece',
+  'pieces',
+  'pcs',
+  'clove',
+  'cloves',
+  'can',
+  'cans',
+  'packet',
+  'packets',
+  'pack',
+  'slice',
+  'slices',
+  'bunch',
 };
 
 /// Parses pasted recipe text into clean, de-duplicated ingredient names.
@@ -29,8 +59,10 @@ List<String> parseIngredients(String text) {
     final tokens = line.split(RegExp(r'\s+'));
     var start = 0;
     while (start < tokens.length) {
-      final t =
-          tokens[start].toLowerCase().replaceAll(RegExp(r'[^a-z0-9/.]'), '');
+      final t = tokens[start].toLowerCase().replaceAll(
+        RegExp(r'[^a-z0-9/.]'),
+        '',
+      );
       final isNumber = RegExp(r'^[\d/.]+$').hasMatch(t);
       if (isNumber || _unitWords.contains(t)) {
         start++;
@@ -50,7 +82,9 @@ List<String> parseIngredients(String text) {
 /// are missing, given the list of in-stock inventory names. Case-insensitive;
 /// matches if a stock name contains the ingredient or vice versa.
 ({List<String> inStock, List<String> missing}) matchIngredientNames(
-    List<String> ingredients, List<String> stockNames) {
+  List<String> ingredients,
+  List<String> stockNames,
+) {
   final lowered = stockNames.map((s) => s.toLowerCase()).toList();
   final inStock = <String>[];
   final missing = <String>[];
@@ -58,8 +92,9 @@ List<String> parseIngredients(String text) {
     final name = raw.trim();
     if (name.isEmpty) continue;
     final lower = name.toLowerCase();
-    final found = lowered
-        .any((s) => s == lower || s.contains(lower) || lower.contains(s));
+    final found = lowered.any(
+      (s) => s == lower || s.contains(lower) || lower.contains(s),
+    );
     (found ? inStock : missing).add(name);
   }
   return (inStock: inStock, missing: missing);

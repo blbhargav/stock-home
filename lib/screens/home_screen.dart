@@ -36,17 +36,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _openForm(BuildContext context, {GroceryItem? existing}) {
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => GroceryFormScreen(existing: existing),
-      ),
+      MaterialPageRoute(builder: (_) => GroceryFormScreen(existing: existing)),
     );
   }
 
   void _openDetail(BuildContext context, GroceryItem item) {
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ItemDetailScreen(itemId: item.id),
-      ),
+      MaterialPageRoute(builder: (_) => ItemDetailScreen(itemId: item.id)),
     );
   }
 
@@ -84,14 +80,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: TextField(
                         controller: qtyCtrl,
                         keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
+                          decimal: true,
+                        ),
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(
-                              RegExp(r'^\d*[.,]?\d*')),
+                            RegExp(r'^\d*[.,]?\d*'),
+                          ),
                         ],
-                        decoration: const InputDecoration(
-                          labelText: 'Qty',
-                        ),
+                        decoration: const InputDecoration(labelText: 'Qty'),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -102,11 +98,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         isExpanded: true,
                         decoration: const InputDecoration(labelText: 'Unit'),
                         items: GroceryCategories.units
-                            .map((u) =>
-                                DropdownMenuItem(value: u, child: Text(u)))
+                            .map(
+                              (u) => DropdownMenuItem(value: u, child: Text(u)),
+                            )
                             .toList(),
-                        onChanged: (v) =>
-                            setLocal(() => unit = v ?? unit),
+                        onChanged: (v) => setLocal(() => unit = v ?? unit),
                       ),
                     ),
                   ],
@@ -117,8 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Category'),
                   items: GroceryCategories.all
-                      .map((c) =>
-                          DropdownMenuItem(value: c, child: Text(c)))
+                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                       .toList(),
                   onChanged: (v) => setLocal(() => category = v ?? 'Other'),
                 ),
@@ -187,9 +182,11 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!context.mounted) return;
     final scannedName = product?.name;
     if (scannedName == null) {
-      messenger.showSnackBar(const SnackBar(
-        content: Text('Product not recognised. Add it manually.'),
-      ));
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Product not recognised. Add it manually.'),
+        ),
+      );
       return;
     }
 
@@ -212,10 +209,12 @@ class _HomeScreenState extends State<HomeScreen> {
       if (context.mounted) {
         messenger
           ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(
-            behavior: SnackBarBehavior.floating,
-            content: Text('✓ ${match.name} marked purchased'),
-          ));
+          ..showSnackBar(
+            SnackBar(
+              behavior: SnackBarBehavior.floating,
+              content: Text('✓ ${match.name} marked purchased'),
+            ),
+          );
       }
     } else {
       // Not on the list — offer to add it.
@@ -243,17 +242,18 @@ class _HomeScreenState extends State<HomeScreen> {
           updatedBy: who,
         );
         if (context.mounted) {
-          messenger.showSnackBar(SnackBar(
-            behavior: SnackBarBehavior.floating,
-            content: Text('$scannedName added to shopping list'),
-          ));
+          messenger.showSnackBar(
+            SnackBar(
+              behavior: SnackBarBehavior.floating,
+              content: Text('$scannedName added to shopping list'),
+            ),
+          );
         }
       }
     }
   }
 
-  Future<void> _confirmDelete(
-      BuildContext context, GroceryItem item) async {
+  Future<void> _confirmDelete(BuildContext context, GroceryItem item) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -291,7 +291,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _markAllPurchased(
-      BuildContext context, GroceryProvider provider) async {
+    BuildContext context,
+    GroceryProvider provider,
+  ) async {
     final count = provider.needsPurchaseCount;
     if (count == 0) return;
     final confirmed = await showDialog<bool>(
@@ -328,8 +330,8 @@ class _HomeScreenState extends State<HomeScreen> {
           _tabIndex == 0
               ? 'StockHome'
               : _tabIndex == 1
-                  ? 'Categories'
-                  : 'Shopping List',
+              ? 'Categories'
+              : 'Shopping List',
         ),
         actions: [
           if (_tabIndex == 2)
@@ -364,8 +366,8 @@ class _HomeScreenState extends State<HomeScreen> {
             child: _tabIndex == 0
                 ? const _InventoryTab()
                 : _tabIndex == 1
-                    ? const CategoriesTab()
-                    : const _ShoppingListTab(),
+                ? const CategoriesTab()
+                : const _ShoppingListTab(),
           ),
         ],
       ),
@@ -444,18 +446,16 @@ class _HomeScreenState extends State<HomeScreen> {
       onSignOut: () => auth.signOut(),
       onRemindersChanged: () =>
           context.read<GroceryProvider>().refreshReminders(),
-      onManageMembers: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const MembersScreen()),
-      ),
-      onInsights: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const InsightsScreen()),
-      ),
-      onActivity: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const ActivityFeedScreen()),
-      ),
-      onRecipeImport: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const RecipeImportScreen()),
-      ),
+      onManageMembers: () =>
+          Navigator.of(context)
+              .push(MaterialPageRoute(builder: (_) => const MembersScreen())),
+      onInsights: () =>
+          Navigator.of(context)
+              .push(MaterialPageRoute(builder: (_) => const InsightsScreen())),
+      onActivity: () => Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => const ActivityFeedScreen())),
+      onRecipeImport: () => Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => const RecipeImportScreen())),
     );
 
     // Keep the messenger reference used to avoid using context after await.
@@ -573,7 +573,9 @@ class _InventoryTabState extends State<_InventoryTab> {
                   _FilterChip(
                     label: 'To buy',
                     count: provider.needsPurchaseCount,
-                    countColor: AppTheme.statusColor(GroceryStatus.needsPurchase),
+                    countColor: AppTheme.statusColor(
+                      GroceryStatus.needsPurchase,
+                    ),
                     filter: GroceryFilter.needsPurchase,
                     selected: provider.filter == GroceryFilter.needsPurchase,
                   ),
@@ -587,7 +589,9 @@ class _InventoryTabState extends State<_InventoryTab> {
                   _FilterChip(
                     label: 'Expired',
                     count: provider.expiredCount,
-                    countColor: AppTheme.statusColor(GroceryStatus.needsPurchase),
+                    countColor: AppTheme.statusColor(
+                      GroceryStatus.needsPurchase,
+                    ),
                     filter: GroceryFilter.expired,
                     selected: provider.filter == GroceryFilter.expired,
                   ),
@@ -761,7 +765,9 @@ class _InventoryTabState extends State<_InventoryTab> {
       .toList(growable: false);
 
   Future<void> _bulkDelete(
-      BuildContext context, GroceryProvider provider) async {
+    BuildContext context,
+    GroceryProvider provider,
+  ) async {
     final selected = _selectedItems(provider);
     if (selected.isEmpty) return;
     final messenger = ScaffoldMessenger.of(context);
@@ -772,11 +778,13 @@ class _InventoryTabState extends State<_InventoryTab> {
         content: const Text('This removes them from the household list.'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Delete')),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
         ],
       ),
     );
@@ -798,7 +806,10 @@ class _InventoryTabState extends State<_InventoryTab> {
   }
 
   Future<void> _bulkAddToList(
-      BuildContext context, GroceryProvider provider, String name) async {
+    BuildContext context,
+    GroceryProvider provider,
+    String name,
+  ) async {
     final selected = _selectedItems(provider);
     if (selected.isEmpty) return;
     final messenger = ScaffoldMessenger.of(context);
@@ -815,7 +826,10 @@ class _InventoryTabState extends State<_InventoryTab> {
   }
 
   Future<void> _bulkChangeCategory(
-      BuildContext context, GroceryProvider provider, String name) async {
+    BuildContext context,
+    GroceryProvider provider,
+    String name,
+  ) async {
     final selected = _selectedItems(provider);
     if (selected.isEmpty) return;
     final category = await showModalBottomSheet<String>(
@@ -826,10 +840,7 @@ class _InventoryTabState extends State<_InventoryTab> {
           shrinkWrap: true,
           children: [
             for (final c in GroceryCategories.all)
-              ListTile(
-                title: Text(c),
-                onTap: () => Navigator.pop(ctx, c),
-              ),
+              ListTile(title: Text(c), onTap: () => Navigator.pop(ctx, c)),
           ],
         ),
       ),
@@ -872,8 +883,10 @@ class _SelectionActionBar extends StatelessWidget {
                 icon: const Icon(Icons.close),
                 onPressed: onCancel,
               ),
-              Text('$count selected',
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text(
+                '$count selected',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
               const Spacer(),
               IconButton(
                 tooltip: 'Add to shopping list',
@@ -887,8 +900,10 @@ class _SelectionActionBar extends StatelessWidget {
               ),
               IconButton(
                 tooltip: 'Delete',
-                icon: Icon(Icons.delete_outline,
-                    color: AppTheme.statusColor(GroceryStatus.needsPurchase)),
+                icon: Icon(
+                  Icons.delete_outline,
+                  color: AppTheme.statusColor(GroceryStatus.needsPurchase),
+                ),
                 onPressed: count == 0 ? null : onDelete,
               ),
             ],
@@ -930,15 +945,17 @@ class _ShoppingListTab extends StatelessWidget {
   static String _fmtQty(double qty) =>
       qty == qty.truncateToDouble() ? qty.toInt().toString() : qty.toString();
 
-  Future<void> _markPurchased(BuildContext context, GroceryProvider provider,
-      GroceryItem item) async {
+  Future<void> _markPurchased(
+    BuildContext context,
+    GroceryProvider provider,
+    GroceryItem item,
+  ) async {
     final name = context.read<AuthProvider>().resolvedDisplayName;
     final messenger = ScaffoldMessenger.of(context);
     final price = await _askPrice(context, item.name);
     // _askPrice returns a sentinel for cancel vs. a (possibly null) price.
     if (price == _priceCancelled) return;
-    await provider.markInCart(item,
-        updatedBy: name, price: price as double?);
+    await provider.markInCart(item, updatedBy: name, price: price as double?);
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -973,8 +990,9 @@ class _ShoppingListTab extends StatelessWidget {
             TextField(
               controller: controller,
               autofocus: true,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d*[.,]?\d*')),
               ],
@@ -1042,9 +1060,7 @@ class _ShoppingListTab extends StatelessWidget {
                       padding: const EdgeInsets.all(24),
                       child: Text(
                         'Your shopping list is empty.',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
+                        style: Theme.of(context).textTheme.bodyMedium
                             ?.copyWith(color: scheme.onSurfaceVariant),
                       ),
                     ),
@@ -1065,29 +1081,20 @@ class _ShoppingListTab extends StatelessWidget {
         final name = context.read<AuthProvider>().resolvedDisplayName;
 
         Widget divider() => Divider(
-              height: 1,
-              indent: 72,
-              endIndent: 16,
-              color: scheme.outlineVariant.withValues(alpha: 0.5),
-            );
+          height: 1,
+          indent: 72,
+          endIndent: 16,
+          color: scheme.outlineVariant.withValues(alpha: 0.5),
+        );
 
         return CustomScrollView(
           slivers: [
             SliverToBoxAdapter(
-              child: _ProgressSummary(
-                total: items.length,
-                done: inCart.length,
-              ),
+              child: _ProgressSummary(total: items.length, done: inCart.length),
             ),
-            SliverToBoxAdapter(
-              child: _ShoppingSortBar(provider: provider),
-            ),
-            SliverToBoxAdapter(
-              child: _EstimatedTotal(provider: provider),
-            ),
-            SliverToBoxAdapter(
-              child: _SuggestionsSection(provider: provider),
-            ),
+            SliverToBoxAdapter(child: _ShoppingSortBar(provider: provider)),
+            SliverToBoxAdapter(child: _EstimatedTotal(provider: provider)),
+            SliverToBoxAdapter(child: _SuggestionsSection(provider: provider)),
             if (toBuy.isNotEmpty) ...[
               _SectionHeader(label: 'To buy', count: toBuy.length),
               SliverList.separated(
@@ -1107,11 +1114,15 @@ class _ShoppingListTab extends StatelessWidget {
                     onMarkPurchased: () =>
                         _markPurchased(context, provider, item),
                     onIncrement: () => provider.setQuantity(
-                        item, item.quantity + 1,
-                        updatedBy: name),
+                      item,
+                      item.quantity + 1,
+                      updatedBy: name,
+                    ),
                     onDecrement: () => provider.setQuantity(
-                        item, item.quantity - 1,
-                        updatedBy: name),
+                      item,
+                      item.quantity - 1,
+                      updatedBy: name,
+                    ),
                     onToggleClaim: () {
                       if (item.claimedBy == myUid && item.isClaimed) {
                         provider.unclaimItem(item);
@@ -1129,7 +1140,10 @@ class _ShoppingListTab extends StatelessWidget {
             ],
             if (inCart.isNotEmpty) ...[
               _SectionHeader(
-                  label: 'In your cart', count: inCart.length, dimmed: true),
+                label: 'In your cart',
+                count: inCart.length,
+                dimmed: true,
+              ),
               SliverList.separated(
                 itemCount: inCart.length,
                 separatorBuilder: (_, _) => divider(),
@@ -1182,8 +1196,7 @@ class _SuggestionsSectionState extends State<_SuggestionsSection> {
       future: _future,
       builder: (context, snapshot) {
         final all = snapshot.data ?? const [];
-        final suggestions =
-            all.where((s) => !_added.contains(s.name)).toList();
+        final suggestions = all.where((s) => !_added.contains(s.name)).toList();
         if (suggestions.isEmpty) return const SizedBox.shrink();
 
         return Padding(
@@ -1193,8 +1206,7 @@ class _SuggestionsSectionState extends State<_SuggestionsSection> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.auto_awesome,
-                      size: 16, color: scheme.primary),
+                  Icon(Icons.auto_awesome, size: 16, color: scheme.primary),
                   const SizedBox(width: 6),
                   Text(
                     'SUGGESTED — RUNNING LOW?',
@@ -1207,40 +1219,47 @@ class _SuggestionsSectionState extends State<_SuggestionsSection> {
                 ],
               ),
               const SizedBox(height: 8),
-              ...suggestions.map((s) => Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
-                    decoration: BoxDecoration(
-                      color: scheme.surfaceContainerHighest
-                          .withValues(alpha: 0.4),
-                      borderRadius: BorderRadius.circular(12),
+              ...suggestions.map(
+                (s) => Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerHighest.withValues(
+                      alpha: 0.4,
                     ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(s.name,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w600)),
-                              const SizedBox(height: 2),
-                              Text(
-                                s.reason,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                    color: scheme.onSurfaceVariant),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              s.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
                               ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              s.reason,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
                         ),
-                        TextButton.icon(
-                          onPressed: () => _add(context, s),
-                          icon: const Icon(Icons.add, size: 18),
-                          label: const Text('Add'),
-                        ),
-                      ],
-                    ),
-                  )),
+                      ),
+                      TextButton.icon(
+                        onPressed: () => _add(context, s),
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('Add'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         );
@@ -1280,8 +1299,7 @@ class _EstimatedTotal extends StatelessWidget {
         if (data == null || data.priced == 0) {
           return const SizedBox.shrink();
         }
-        final currency =
-            NumberFormat.currency(symbol: '₹', decimalDigits: 0);
+        final currency = NumberFormat.currency(symbol: '₹', decimalDigits: 0);
         final approx = data.priced < data.totalItems;
         return Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -1293,8 +1311,11 @@ class _EstimatedTotal extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(Icons.payments_outlined,
-                    size: 18, color: scheme.onSecondaryContainer),
+                Icon(
+                  Icons.payments_outlined,
+                  size: 18,
+                  color: scheme.onSecondaryContainer,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -1309,9 +1330,8 @@ class _EstimatedTotal extends StatelessWidget {
                   Text(
                     '${data.priced}/${data.totalItems} priced',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onSecondaryContainer
-                              .withValues(alpha: 0.8),
-                        ),
+                      color: scheme.onSecondaryContainer.withValues(alpha: 0.8),
+                    ),
                   ),
               ],
             ),
@@ -1409,9 +1429,9 @@ class _ProgressSummary extends StatelessWidget {
                     ? 'All done — great shop!'
                     : '$done of $total items purchased',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: allDone ? inStockColor : scheme.onSurface,
-                    ),
+                  fontWeight: FontWeight.w600,
+                  color: allDone ? inStockColor : scheme.onSurface,
+                ),
               ),
             ],
           ),
@@ -1524,15 +1544,16 @@ class _SwipeToPurchaseTile extends StatelessWidget {
         padding: const EdgeInsets.only(left: 24),
         child: Row(
           children: [
-            const Icon(Icons.check_circle_rounded,
-                color: Colors.white, size: 28),
+            const Icon(
+              Icons.check_circle_rounded,
+              color: Colors.white,
+              size: 28,
+            ),
             const SizedBox(width: 10),
             Text(
               'Mark purchased',
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
+              style: Theme.of(context).textTheme.labelLarge
+                  ?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
             ),
           ],
         ),
@@ -1695,7 +1716,8 @@ class _ShoppingTileContent extends StatelessWidget {
     final scheme = theme.colorScheme;
     final purchased = item.status == GroceryStatus.purchased;
     final iconColor = AppTheme.statusColor(
-        purchased ? GroceryStatus.purchased : GroceryStatus.needsPurchase);
+      purchased ? GroceryStatus.purchased : GroceryStatus.needsPurchase,
+    );
 
     return Material(
       color: scheme.surface,
@@ -1741,8 +1763,9 @@ class _ShoppingTileContent extends StatelessWidget {
                           Icon(
                             Icons.swipe_right_outlined,
                             size: 14,
-                            color:
-                                scheme.onSurfaceVariant.withValues(alpha: 0.5),
+                            color: scheme.onSurfaceVariant.withValues(
+                              alpha: 0.5,
+                            ),
                           ),
                         ],
                       ],
@@ -1769,18 +1792,15 @@ class _ShoppingTileContent extends StatelessWidget {
                             onPressed: item.quantity <= 1 ? null : onDecrement,
                           ),
                           Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
                             child: Text(
                               fmtQty(item.quantity),
                               style: const TextStyle(
-                                  fontWeight: FontWeight.w700),
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
-                          _MiniStepBtn(
-                            icon: Icons.add,
-                            onPressed: onIncrement,
-                          ),
+                          _MiniStepBtn(icon: Icons.add, onPressed: onIncrement),
                         ],
                       ],
                     ),
@@ -1831,10 +1851,7 @@ class _ClaimButton extends StatelessWidget {
         label: const Text('Got it'),
       );
     }
-    return TextButton(
-      onPressed: onPressed,
-      child: const Text("I'll get it"),
-    );
+    return TextButton(onPressed: onPressed, child: const Text("I'll get it"));
   }
 }
 
@@ -1893,11 +1910,7 @@ class _OfflineBanner extends StatelessWidget {
                 'Offline — changes will sync when you reconnect',
                 runningLow,
               )
-            : (
-                Icons.sync,
-                'Syncing changes…',
-                scheme.primary,
-              );
+            : (Icons.sync, 'Syncing changes…', scheme.primary);
 
         return Material(
           color: color.withValues(alpha: 0.12),
@@ -1910,10 +1923,8 @@ class _OfflineBanner extends StatelessWidget {
                 Expanded(
                   child: Text(
                     message,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: color,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: color, fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
@@ -2086,8 +2097,7 @@ class _SortGroupBar extends StatelessWidget {
               ],
             ),
             itemBuilder: (context) => GrocerySort.values
-                .map((s) =>
-                    PopupMenuItem(value: s, child: Text(s.label)))
+                .map((s) => PopupMenuItem(value: s, child: Text(s.label)))
                 .toList(),
           ),
           const Spacer(),
@@ -2135,8 +2145,7 @@ class _FilterChip extends StatelessWidget {
             if (count != null && count! > 0) ...[
               const SizedBox(width: 6),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(
                   color: selected
                       ? scheme.onSecondaryContainer.withValues(alpha: 0.20)
@@ -2202,16 +2211,18 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 20),
             Text(
               title,
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w700),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: scheme.onSurfaceVariant),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
             ),
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: 24),

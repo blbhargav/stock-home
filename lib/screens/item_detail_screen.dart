@@ -57,7 +57,9 @@ class ItemDetailScreen extends StatelessWidget {
           // Item was deleted (possibly by another member) — close gracefully.
           return Scaffold(
             appBar: AppBar(),
-            body: const Center(child: Text('This item is no longer available.')),
+            body: const Center(
+              child: Text('This item is no longer available.'),
+            ),
           );
         }
 
@@ -109,15 +111,15 @@ class _DetailBody extends StatelessWidget {
                   height: 220,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  loadingBuilder: (context, child, progress) =>
-                      progress == null
-                          ? child
-                          : Container(
-                              height: 220,
-                              color: scheme.surfaceContainerHighest,
-                              child: const Center(
-                                  child: CircularProgressIndicator()),
-                            ),
+                  loadingBuilder: (context, child, progress) => progress == null
+                      ? child
+                      : Container(
+                          height: 220,
+                          color: scheme.surfaceContainerHighest,
+                          child: const Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        ),
                   errorBuilder: (context, error, stack) =>
                       _iconHero(scheme, statusColor),
                 ),
@@ -130,8 +132,9 @@ class _DetailBody extends StatelessWidget {
           // ── Title + status chips ─────────────────────────────────────────
           Text(
             item.name,
-            style: theme.textTheme.headlineSmall
-                ?.copyWith(fontWeight: FontWeight.w800),
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
           ),
           const SizedBox(height: 8),
           Wrap(
@@ -140,8 +143,7 @@ class _DetailBody extends StatelessWidget {
             children: [
               _chip(context, item.status.label, statusColor),
               if (item.isStaple)
-                _chip(context, 'Staple', scheme.primary,
-                    icon: Icons.autorenew),
+                _chip(context, 'Staple', scheme.primary, icon: Icons.autorenew),
               if (item.isClaimed)
                 _chip(
                   context,
@@ -225,21 +227,25 @@ class _DetailBody extends StatelessWidget {
                         fit: BoxFit.cover,
                         loadingBuilder: (context, child, progress) =>
                             progress == null
-                                ? child
-                                : Container(
-                                    width: 110,
-                                    height: 110,
-                                    color: scheme.surfaceContainerHighest,
-                                    child: const Center(
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2)),
+                            ? child
+                            : Container(
+                                width: 110,
+                                height: 110,
+                                color: scheme.surfaceContainerHighest,
+                                child: const Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
                                   ),
+                                ),
+                              ),
                         errorBuilder: (context, error, stack) => Container(
                           width: 110,
                           height: 110,
                           color: scheme.surfaceContainerHighest,
-                          child: Icon(Icons.broken_image_outlined,
-                              color: scheme.onSurfaceVariant),
+                          child: Icon(
+                            Icons.broken_image_outlined,
+                            color: scheme.onSurfaceVariant,
+                          ),
                         ),
                       ),
                     ),
@@ -302,8 +308,12 @@ class _DetailBody extends StatelessWidget {
     );
   }
 
-  Widget _chip(BuildContext context, String label, Color color,
-      {IconData? icon}) {
+  Widget _chip(
+    BuildContext context,
+    String label,
+    Color color, {
+    IconData? icon,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
@@ -321,7 +331,10 @@ class _DetailBody extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-                color: color, fontWeight: FontWeight.w600, fontSize: 12),
+              color: color,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
           ),
         ],
       ),
@@ -415,8 +428,9 @@ class _InfoRow extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: theme.textTheme.labelSmall
-                      ?.copyWith(color: scheme.onSurfaceVariant),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(

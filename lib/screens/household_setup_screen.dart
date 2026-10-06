@@ -90,10 +90,12 @@ class _HouseholdSetupScreenState extends State<HouseholdSetupScreen> {
       // Otherwise AppGate routes to HomeScreen once householdId is set.
     } catch (e) {
       if (mounted) {
-        setState(() => _joinError = e is StateError
-            ? e.message
-            : 'No household found for that code. Double-check it with '
-                'whoever invited you.');
+        setState(
+          () => _joinError = e is StateError
+              ? e.message
+              : 'No household found for that code. Double-check it with '
+                    'whoever invited you.',
+        );
       }
     } finally {
       if (mounted) setState(() => _joining = false);
@@ -391,9 +393,8 @@ class _OrDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.labelLarge?.copyWith(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        );
+    final style = Theme.of(context).textTheme.labelLarge
+        ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant);
     return Row(
       children: [
         Expanded(child: Divider(color: color)),

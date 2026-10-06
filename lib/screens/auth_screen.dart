@@ -197,8 +197,9 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                   ],
                   selected: {_mode},
-                  onSelectionChanged:
-                      _loading ? null : (s) => _setMode(s.first),
+                  onSelectionChanged: _loading
+                      ? null
+                      : (s) => _setMode(s.first),
                 ),
                 const SizedBox(height: 20),
                 AnimatedSize(
@@ -255,11 +256,13 @@ class _AuthScreenState extends State<AuthScreen> {
                       tooltip: _obscurePassword
                           ? 'Show password'
                           : 'Hide password',
-                      icon: Icon(_obscurePassword
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined),
-                      onPressed: () => setState(
-                          () => _obscurePassword = !_obscurePassword),
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
                   validator: _validatePassword,
@@ -315,8 +318,8 @@ class _AuthScreenState extends State<AuthScreen> {
         TextButton(
           onPressed: _loading
               ? null
-              : () => _setMode(
-                  _isRegister ? AuthMode.signIn : AuthMode.register),
+              : () =>
+                    _setMode(_isRegister ? AuthMode.signIn : AuthMode.register),
           child: Text(_isRegister ? 'Sign in' : 'Create account'),
         ),
       ],

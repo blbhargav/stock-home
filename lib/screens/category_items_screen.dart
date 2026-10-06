@@ -23,10 +23,7 @@ class CategoryItemsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(category),
-        leading: const BackButton(),
-      ),
+      appBar: AppBar(title: Text(category), leading: const BackButton()),
       body: Consumer<GroceryProvider>(
         builder: (context, provider, _) {
           final items = provider.allItems
@@ -42,8 +39,7 @@ class CategoryItemsScreen extends StatelessWidget {
             itemCount: items.length,
             itemBuilder: (context, index) {
               final item = items[index];
-              final name =
-                  context.read<AuthProvider>().resolvedDisplayName;
+              final name = context.read<AuthProvider>().resolvedDisplayName;
               return GroceryTile(
                 item: item,
                 onTap: () => Navigator.of(context).push(
@@ -71,11 +67,9 @@ class CategoryItemsScreen extends StatelessWidget {
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => GroceryFormScreen(),
-          ),
-        ),
+        onPressed: () =>
+            Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => GroceryFormScreen())),
         icon: const Icon(Icons.add),
         label: const Text('Add'),
       ),
@@ -145,21 +139,26 @@ class _EmptyCategory extends StatelessWidget {
                 color: scheme.primaryContainer.withValues(alpha: 0.5),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.category_outlined,
-                  size: 36, color: scheme.primary),
+              child: Icon(
+                Icons.category_outlined,
+                size: 36,
+                color: scheme.primary,
+              ),
             ),
             const SizedBox(height: 20),
             Text(
               'No items in $category',
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w700),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               'Tap "Add" to add your first item in this category.',
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: scheme.onSurfaceVariant),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
           ],

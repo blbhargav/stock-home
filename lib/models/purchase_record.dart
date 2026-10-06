@@ -20,8 +20,7 @@ class PurchaseRecord {
   final String? purchasedBy;
   final DateTime? purchasedAt;
 
-  factory PurchaseRecord.fromDoc(
-      DocumentSnapshot<Map<String, dynamic>> doc) {
+  factory PurchaseRecord.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? const <String, dynamic>{};
     return PurchaseRecord(
       id: doc.id,
@@ -34,10 +33,10 @@ class PurchaseRecord {
   }
 
   Map<String, dynamic> toMap() => {
-        'name': name,
-        'category': category,
-        'price': price,
-        'purchasedBy': purchasedBy,
-        'purchasedAt': FieldValue.serverTimestamp(),
-      };
+    'name': name,
+    'category': category,
+    'price': price,
+    'purchasedBy': purchasedBy,
+    'purchasedAt': FieldValue.serverTimestamp(),
+  };
 }

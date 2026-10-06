@@ -160,18 +160,13 @@ class _AccountSheet extends StatelessWidget {
     }
     if (csv.trim().isEmpty) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Nothing to export yet.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Nothing to export yet.')));
       }
       return;
     }
-    await SharePlus.instance.share(
-      ShareParams(
-        text: csv,
-        subject: filename,
-      ),
-    );
+    await SharePlus.instance.share(ShareParams(text: csv, subject: filename));
   }
 
   Future<void> _confirmSignOut(BuildContext context) async {
@@ -245,7 +240,8 @@ class _AccountSheet extends StatelessWidget {
                 ),
                 title: Text(h.name),
                 subtitle: Text(
-                    '${h.memberCount} member${h.memberCount == 1 ? '' : 's'}'),
+                  '${h.memberCount} member${h.memberCount == 1 ? '' : 's'}',
+                ),
                 trailing: h.id == auth.householdId
                     ? Icon(Icons.check_circle, color: scheme.primary)
                     : null,
@@ -310,16 +306,18 @@ class _AccountSheet extends StatelessWidget {
                       info.displayName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style:
-                          text.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                      style: text.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       info.email,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: text.bodyMedium
-                          ?.copyWith(color: scheme.onSurfaceVariant),
+                      style: text.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -345,8 +343,9 @@ class _AccountSheet extends StatelessWidget {
                   info.householdName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style:
-                      text.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                  style: text.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -376,8 +375,9 @@ class _AccountSheet extends StatelessWidget {
                     children: [
                       Text(
                         'Household code',
-                        style: text.labelSmall
-                            ?.copyWith(color: scheme.onSurfaceVariant),
+                        style: text.labelSmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       SelectableText(
@@ -535,10 +535,12 @@ class _LanguageSection extends StatelessWidget {
             for (final loc in options)
               ListTile(
                 title: Text(LocaleProvider.labelFor(loc)),
-                trailing: (current?.languageCode ?? '') ==
-                        (loc?.languageCode ?? '')
-                    ? Icon(Icons.check,
-                        color: Theme.of(ctx).colorScheme.primary)
+                trailing:
+                    (current?.languageCode ?? '') == (loc?.languageCode ?? '')
+                    ? Icon(
+                        Icons.check,
+                        color: Theme.of(ctx).colorScheme.primary,
+                      )
                     : null,
                 onTap: () => Navigator.pop(ctx, loc ?? 'system'),
               ),
@@ -625,7 +627,9 @@ class _VersionLabelState extends State<_VersionLabel> {
     try {
       final info = await PackageInfo.fromPlatform();
       if (mounted) {
-        setState(() => _version = 'StockHome v${info.version} (${info.buildNumber})');
+        setState(
+          () => _version = 'StockHome v${info.version} (${info.buildNumber})',
+        );
       }
     } catch (_) {
       // Ignore — just don't show a version.
@@ -637,9 +641,8 @@ class _VersionLabelState extends State<_VersionLabel> {
     if (_version.isEmpty) return const SizedBox(height: 16);
     return Text(
       _version,
-      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
+      style: Theme.of(context).textTheme.bodySmall
+          ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
     );
   }
 }
@@ -649,9 +652,9 @@ class _GroupDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 16),
-        child: Divider(height: 1),
-      );
+    padding: EdgeInsets.symmetric(vertical: 16),
+    child: Divider(height: 1),
+  );
 }
 
 class _RemindersSection extends StatefulWidget {
@@ -730,8 +733,10 @@ class _RemindersSectionState extends State<_RemindersSection> {
         const SizedBox(height: 4),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          secondary: Icon(Icons.notifications_active_outlined,
-              color: scheme.primary),
+          secondary: Icon(
+            Icons.notifications_active_outlined,
+            color: scheme.primary,
+          ),
           title: const Text('Expiry reminders'),
           subtitle: const Text('Get notified before items expire'),
           value: _enabled,
@@ -742,18 +747,25 @@ class _RemindersSectionState extends State<_RemindersSection> {
             padding: const EdgeInsets.only(left: 4, top: 4),
             child: Row(
               children: [
-                Text('Remind me',
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(color: scheme.onSurfaceVariant)),
+                Text(
+                  'Remind me',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
                 const SizedBox(width: 12),
                 DropdownButton<int>(
                   value: _daysBefore,
                   underline: const SizedBox.shrink(),
                   items: _dayOptions
-                      .map((d) => DropdownMenuItem(
-                            value: d,
-                            child: Text(d == 1 ? '1 day before' : '$d days before'),
-                          ))
+                      .map(
+                        (d) => DropdownMenuItem(
+                          value: d,
+                          child: Text(
+                            d == 1 ? '1 day before' : '$d days before',
+                          ),
+                        ),
+                      )
                       .toList(),
                   onChanged: (v) {
                     if (v != null) _setDays(v);

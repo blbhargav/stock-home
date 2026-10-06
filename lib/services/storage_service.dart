@@ -7,7 +7,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 /// Layout: households/{householdId}/groceries/{imageId}.jpg
 class StorageService {
   StorageService({FirebaseStorage? storage})
-      : _storage = storage ?? FirebaseStorage.instance;
+    : _storage = storage ?? FirebaseStorage.instance;
 
   final FirebaseStorage _storage;
 
@@ -30,10 +30,7 @@ class StorageService {
     void Function(double progress)? onProgress,
   }) async {
     final ref = _imageRef(householdId, imageId);
-    final task = ref.putFile(
-      file,
-      SettableMetadata(contentType: 'image/jpeg'),
-    );
+    final task = ref.putFile(file, SettableMetadata(contentType: 'image/jpeg'));
 
     if (onProgress != null) {
       task.snapshotEvents.listen((snapshot) {

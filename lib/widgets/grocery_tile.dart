@@ -74,7 +74,8 @@ class GroceryTile extends StatelessWidget {
                                 width: 16,
                                 height: 16,
                                 child: CircularProgressIndicator(
-                                    strokeWidth: 2),
+                                  strokeWidth: 2,
+                                ),
                               ),
                             ),
                           );
@@ -86,8 +87,11 @@ class GroceryTile extends StatelessWidget {
                             color: statusColor.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Icon(_categoryIcon(item.category),
-                              size: 22, color: statusColor),
+                          child: Icon(
+                            _categoryIcon(item.category),
+                            size: 22,
+                            color: statusColor,
+                          ),
                         ),
                       ),
                     )
@@ -98,8 +102,11 @@ class GroceryTile extends StatelessWidget {
                         color: statusColor.withValues(alpha: 0.12),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(_categoryIcon(item.category),
-                          size: 22, color: statusColor),
+                      child: Icon(
+                        _categoryIcon(item.category),
+                        size: 22,
+                        color: statusColor,
+                      ),
                     ),
               const SizedBox(width: 12),
               Expanded(
@@ -108,16 +115,18 @@ class GroceryTile extends StatelessWidget {
                   children: [
                     Text(
                       item.name,
-                      style: theme.textTheme.titleSmall
-                          ?.copyWith(fontWeight: FontWeight.w700),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 3),
                     Text(
                       '${_trimNum(item.quantity)} ${item.unit} · ${item.category}',
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: scheme.onSurfaceVariant),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -146,8 +155,11 @@ class GroceryTile extends StatelessWidget {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.sticky_note_2_outlined,
-                              size: 12, color: scheme.onSurfaceVariant),
+                          Icon(
+                            Icons.sticky_note_2_outlined,
+                            size: 12,
+                            color: scheme.onSurfaceVariant,
+                          ),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
@@ -167,8 +179,11 @@ class GroceryTile extends StatelessWidget {
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Icon(Icons.history,
-                              size: 12, color: scheme.onSurfaceVariant),
+                          Icon(
+                            Icons.history,
+                            size: 12,
+                            color: scheme.onSurfaceVariant,
+                          ),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
