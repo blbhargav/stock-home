@@ -8,16 +8,20 @@ import '../models/grocery_item.dart';
 import '../providers/auth_provider.dart';
 import '../providers/grocery_provider.dart';
 import '../services/household_service.dart';
+import '../services/product_lookup_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/account_sheet.dart';
 import '../widgets/grocery_tile.dart';
 import 'activity_feed_screen.dart';
+import 'barcode_scanner_screen.dart';
 import 'categories_tab.dart';
+import 'expiry_calendar_screen.dart';
 import 'grocery_form_screen.dart';
 import 'insights_screen.dart';
 import 'item_detail_screen.dart';
 import 'household_setup_screen.dart';
 import 'members_screen.dart';
+import 'recipe_import_screen.dart';
 
 /// Main screen: grocery inventory with filters plus a shopping-list tab.
 class HomeScreen extends StatefulWidget {
@@ -167,6 +171,87 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Scan a barcode while shopping: if the product matches a "to buy" item,
+  /// mark it purchased; otherwise offer to add it to the list.
+  Future<void> _scanToTickOff(BuildContext context) async {
+    final provider = context.read<GroceryProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    final who = context.read<AuthProvider>().resolvedDisplayName;
+
+    final barcode = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
+    );
+    if (barcode == null || !context.mounted) return;
+
+    final product = await ProductLookupService().lookup(barcode);
+    if (!context.mounted) return;
+    final scannedName = product?.name;
+    if (scannedName == null) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text('Product not recognised. Add it manually.'),
+      ));
+      return;
+    }
+
+    // Find a matching "to buy" item (case-insensitive contains either way).
+    final toBuy = provider.shoppingList
+        .where((i) => i.status == GroceryStatus.needsPurchase)
+        .toList();
+    GroceryItem? match;
+    final lower = scannedName.toLowerCase();
+    for (final i in toBuy) {
+      final n = i.name.toLowerCase();
+      if (n == lower || n.contains(lower) || lower.contains(n)) {
+        match = i;
+        break;
+      }
+    }
+
+    if (match != null) {
+      await provider.markInCart(match, updatedBy: who);
+      if (context.mounted) {
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text('✓ ${match.name} marked purchased'),
+          ));
+      }
+    } else {
+      // Not on the list — offer to add it.
+      final add = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('"$scannedName" isn\'t on your list'),
+          content: const Text('Add it to the shopping list?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('No'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Add'),
+            ),
+          ],
+        ),
+      );
+      if (add == true) {
+        await provider.quickAddToShoppingList(
+          scannedName,
+          category: product?.category,
+          updatedBy: who,
+        );
+        if (context.mounted) {
+          messenger.showSnackBar(SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text('$scannedName added to shopping list'),
+          ));
+        }
+      }
+    }
+  }
+
   Future<void> _confirmDelete(
       BuildContext context, GroceryItem item) async {
     final confirmed = await showDialog<bool>(
@@ -247,6 +332,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   : 'Shopping List',
         ),
         actions: [
+          if (_tabIndex == 2)
+            IconButton(
+              tooltip: 'Scan to tick off',
+              icon: const Icon(Icons.qr_code_scanner),
+              onPressed: () => _scanToTickOff(context),
+            ),
           if (_tabIndex == 2)
             Consumer<GroceryProvider>(
               builder: (context, provider, _) {
@@ -361,6 +452,9 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       onActivity: () => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const ActivityFeedScreen()),
+      ),
+      onRecipeImport: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const RecipeImportScreen()),
       ),
     );
 
@@ -1861,7 +1955,11 @@ class _PantrySummaryStrip extends StatelessWidget {
                 label: 'Expiring soon',
                 icon: Icons.schedule,
                 color: amber,
-                onTap: () => provider.setFilter(GroceryFilter.expiringSoon),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const ExpiryCalendarScreen(),
+                  ),
+                ),
               ),
             ),
           if (expiringSoon > 0 && (toBuy > 0 || expired > 0))

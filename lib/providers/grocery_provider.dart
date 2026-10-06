@@ -607,6 +607,40 @@ class GroceryProvider extends ChangeNotifier {
   /// Returns a CSV of the current inventory.
   String inventoryCsv() => const ExportService().inventoryToCsv(_items);
 
+  /// For a list of ingredient names, reports which are already in stock
+  /// (status inStock/runningLow) and which are missing. Case-insensitive,
+  /// matches if an inventory item name contains the ingredient or vice versa.
+  ({List<String> inStock, List<String> missing}) matchIngredients(
+      List<String> ingredients) {
+    final stockNames = _items
+        .where((i) =>
+            i.status == GroceryStatus.inStock ||
+            i.status == GroceryStatus.runningLow)
+        .map((i) => i.name.toLowerCase())
+        .toList();
+    final inStock = <String>[];
+    final missing = <String>[];
+    for (final raw in ingredients) {
+      final name = raw.trim();
+      if (name.isEmpty) continue;
+      final lower = name.toLowerCase();
+      final found = stockNames.any(
+          (s) => s == lower || s.contains(lower) || lower.contains(s));
+      (found ? inStock : missing).add(name);
+    }
+    return (inStock: inStock, missing: missing);
+  }
+
+  /// Adds a list of ingredient names to the shopping list (needs purchase).
+  Future<void> addIngredientsToList(
+    List<String> names, {
+    String? updatedBy,
+  }) async {
+    for (final name in names) {
+      await quickAddToShoppingList(name, updatedBy: updatedBy);
+    }
+  }
+
   /// Returns a CSV of the household's purchase history.
   Future<String> purchasesCsv() async {
     final id = _householdId;
