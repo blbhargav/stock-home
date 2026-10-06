@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/grocery_item.dart';
 import '../models/purchase_record.dart';
+import '../models/recipe_parser.dart';
 import '../services/export_service.dart';
 import '../services/grocery_service.dart';
 import '../services/notification_service.dart';
@@ -616,19 +617,9 @@ class GroceryProvider extends ChangeNotifier {
         .where((i) =>
             i.status == GroceryStatus.inStock ||
             i.status == GroceryStatus.runningLow)
-        .map((i) => i.name.toLowerCase())
+        .map((i) => i.name)
         .toList();
-    final inStock = <String>[];
-    final missing = <String>[];
-    for (final raw in ingredients) {
-      final name = raw.trim();
-      if (name.isEmpty) continue;
-      final lower = name.toLowerCase();
-      final found = stockNames.any(
-          (s) => s == lower || s.contains(lower) || lower.contains(s));
-      (found ? inStock : missing).add(name);
-    }
-    return (inStock: inStock, missing: missing);
+    return matchIngredientNames(ingredients, stockNames);
   }
 
   /// Adds a list of ingredient names to the shopping list (needs purchase).

@@ -14,6 +14,12 @@ import '../services/notification_service.dart';
 import '../services/settings_service.dart';
 import '../theme/app_theme.dart';
 
+/// Whether to show the in-app language picker. Disabled until the full UI is
+/// localized — currently only a few screens use AppLocalizations, so switching
+/// languages would leave most of the app in English. Set to `true` once string
+/// extraction across all screens is complete.
+const bool kLanguagePickerEnabled = false;
+
 /// Everything the account sheet needs to display.
 class AccountInfo {
   const AccountInfo({
@@ -397,8 +403,14 @@ class _AccountSheet extends StatelessWidget {
           _RemindersSection(onChanged: onRemindersChanged),
           const _GroupDivider(),
           const _ThemeSection(),
-          const _GroupDivider(),
-          const _LanguageSection(),
+          // Language picker is hidden until full UI localization is complete.
+          // Only a couple of screens are translated so far; showing the picker
+          // would imply the whole app switches languages, which it doesn't yet.
+          // Flip `kLanguagePickerEnabled` to re-enable once strings are done.
+          if (kLanguagePickerEnabled) ...[
+            const _GroupDivider(),
+            const _LanguageSection(),
+          ],
           const _GroupDivider(),
           _ActionTile(
             icon: Icons.person_add_alt_1_rounded,

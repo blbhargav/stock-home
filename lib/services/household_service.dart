@@ -1,5 +1,26 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// Pure migration helper: reads a user profile map and returns the household
+/// IDs + active id, migrating a legacy single `householdId` into list form.
+/// Extracted as a top-level function so it can be unit-tested without Firestore.
+({List<String> ids, String? active}) parseUserHouseholds(
+    Map<String, dynamic>? data) {
+  if (data == null) return (ids: const [], active: null);
+  final ids = ((data['householdIds'] as List?) ?? const [])
+      .whereType<String>()
+      .toList();
+  final legacy = data['householdId'] as String?;
+  if (ids.isEmpty && legacy != null && legacy.isNotEmpty) {
+    return (ids: [legacy], active: legacy);
+  }
+  var active = data['activeHouseholdId'] as String?;
+  if ((active == null || !ids.contains(active)) && ids.isNotEmpty) {
+    active = ids.first;
+  }
+  return (ids: ids, active: active);
+}
+
+
 /// Basic household details for display (name + member count).
 class HouseholdInfo {
   const HouseholdInfo({
@@ -45,21 +66,8 @@ class HouseholdService {
   /// Reads the user's household IDs + active id, migrating the legacy single
   /// `householdId` field into the list form when needed.
   ({List<String> ids, String? active}) _parseUser(
-      Map<String, dynamic>? data) {
-    if (data == null) return (ids: const [], active: null);
-    final ids = ((data['householdIds'] as List?) ?? const [])
-        .whereType<String>()
-        .toList();
-    final legacy = data['householdId'] as String?;
-    if (ids.isEmpty && legacy != null && legacy.isNotEmpty) {
-      return (ids: [legacy], active: legacy);
-    }
-    var active = data['activeHouseholdId'] as String?;
-    if ((active == null || !ids.contains(active)) && ids.isNotEmpty) {
-      active = ids.first;
-    }
-    return (ids: ids, active: active);
-  }
+          Map<String, dynamic>? data) =>
+      parseUserHouseholds(data);
 
   /// Returns the display name stored in the user's Firestore profile, or null.
   Future<String?> getUserName(String uid) async {

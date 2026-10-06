@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/grocery_item.dart';
+import '../models/recipe_parser.dart';
 import '../providers/auth_provider.dart';
 import '../providers/grocery_provider.dart';
 import '../theme/app_theme.dart';
-import '../models/grocery_item.dart';
 
 /// Paste a recipe's ingredients; see what's in stock vs. missing and add the
 /// missing ones to the shopping list in one tap.
@@ -29,45 +30,8 @@ class _RecipeImportScreenState extends State<RecipeImportScreen> {
   }
 
   /// Parses pasted recipe text into clean ingredient names, one per line.
-  /// Strips leading bullets/numbers/quantities and common units.
-  List<String> _parseIngredients(String text) {
-    final lines = text.split('\n');
-    final result = <String>[];
-    final seen = <String>{};
-    final unitWords = {
-      'cup', 'cups', 'tbsp', 'tsp', 'tablespoon', 'tablespoons',
-      'teaspoon', 'teaspoons', 'g', 'kg', 'gram', 'grams', 'ml', 'l',
-      'litre', 'litres', 'liter', 'liters', 'pinch', 'oz', 'lb', 'lbs',
-      'piece', 'pieces', 'pcs', 'clove', 'cloves', 'can', 'cans',
-      'packet', 'packets', 'pack', 'slice', 'slices', 'bunch',
-    };
-    for (var line in lines) {
-      line = line.trim();
-      if (line.isEmpty) continue;
-      // Remove leading bullets / list markers / numbering.
-      line = line.replaceFirst(RegExp(r'^[\-\*•\u2022\d\.\)\s]+'), '');
-      // Drop anything after a comma or parenthesis (prep notes).
-      line = line.split(RegExp(r'[,(]')).first.trim();
-      // Tokenize and strip leading quantity + unit tokens.
-      final tokens = line.split(RegExp(r'\s+'));
-      var start = 0;
-      while (start < tokens.length) {
-        final t = tokens[start].toLowerCase().replaceAll(
-            RegExp(r'[^a-z0-9/.]'), '');
-        final isNumber = RegExp(r'^[\d/.]+$').hasMatch(t);
-        if (isNumber || unitWords.contains(t)) {
-          start++;
-        } else {
-          break;
-        }
-      }
-      final name = tokens.sublist(start).join(' ').trim();
-      if (name.isEmpty) continue;
-      final key = name.toLowerCase();
-      if (seen.add(key)) result.add(name);
-    }
-    return result;
-  }
+  /// Delegates to the pure, unit-tested [parseIngredients] helper.
+  List<String> _parseIngredients(String text) => parseIngredients(text);
 
   void _analyze() {
     final ingredients = _parseIngredients(_controller.text);
