@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:firebase_storage/firebase_storage.dart';
@@ -32,8 +33,9 @@ class StorageService {
     final ref = _imageRef(householdId, imageId);
     final task = ref.putFile(file, SettableMetadata(contentType: 'image/jpeg'));
 
+    StreamSubscription<TaskSnapshot>? progressSub;
     if (onProgress != null) {
-      task.snapshotEvents.listen((snapshot) {
+      progressSub = task.snapshotEvents.listen((snapshot) {
         final total = snapshot.totalBytes;
         if (total > 0) {
           onProgress(snapshot.bytesTransferred / total);
@@ -41,8 +43,13 @@ class StorageService {
       });
     }
 
-    final snapshot = await task;
-    return snapshot.ref.getDownloadURL();
+    try {
+      final snapshot = await task;
+      return await snapshot.ref.getDownloadURL();
+    } finally {
+      // Always release the progress listener, including on error/cancel.
+      await progressSub?.cancel();
+    }
   }
 
   /// Deletes an image by its download URL. Safe to call even if already gone.
