@@ -117,6 +117,19 @@ class GroceryProvider extends ChangeNotifier {
   ShoppingSort _shoppingSort = ShoppingSort.name;
   String _search = '';
 
+  // --- Cached view of the filtered+sorted inventory. ---
+  // visibleItems is read several times per rebuild (and again indirectly by
+  // groupedVisibleItems), each time filtering, copying and sorting the whole
+  // list. We memoize the result and only recompute when an input changes.
+  List<GroceryItem>? _visibleCache;
+  Map<String, List<GroceryItem>>? _groupedCache;
+
+  /// Discards the memoized visible/grouped lists so they recompute on next read.
+  void _invalidateViewCache() {
+    _visibleCache = null;
+    _groupedCache = null;
+  }
+
   List<GroceryItem> get allItems => List.unmodifiable(_items);
 
   /// Returns distinct, non-empty notes from all current items, ordered by
@@ -157,8 +170,12 @@ class GroceryProvider extends ChangeNotifier {
   /// Number of already expired items.
   int get expiredCount => _items.where((i) => i.isExpired).length;
 
-  /// Items after applying the active filter and search query.
+  /// Items after applying the active filter and search query, sorted.
+  /// Memoized; recomputed only when items/filter/search/sort change.
   List<GroceryItem> get visibleItems {
+    final cached = _visibleCache;
+    if (cached != null) return cached;
+
     Iterable<GroceryItem> result = _items;
 
     switch (_filter) {
@@ -193,7 +210,9 @@ class GroceryProvider extends ChangeNotifier {
 
     final list = result.toList();
     _applySort(list);
-    return List.unmodifiable(list);
+    final out = List<GroceryItem>.unmodifiable(list);
+    _visibleCache = out;
+    return out;
   }
 
   void _applySort(List<GroceryItem> list) {
@@ -238,12 +257,16 @@ class GroceryProvider extends ChangeNotifier {
   /// Visible items grouped by category (sorted category names), for the
   /// grouped inventory view.
   Map<String, List<GroceryItem>> get groupedVisibleItems {
+    final cached = _groupedCache;
+    if (cached != null) return cached;
     final groups = <String, List<GroceryItem>>{};
     for (final item in visibleItems) {
       groups.putIfAbsent(item.category, () => []).add(item);
     }
     final sortedKeys = groups.keys.toList()..sort();
-    return {for (final k in sortedKeys) k: groups[k]!};
+    final out = {for (final k in sortedKeys) k: groups[k]!};
+    _groupedCache = out;
+    return out;
   }
 
   /// Items on the shopping list: still needed, or purchased-but-in-cart.
@@ -305,12 +328,14 @@ class GroceryProvider extends ChangeNotifier {
   void setFilter(GroceryFilter filter) {
     if (_filter == filter) return;
     _filter = filter;
+    _invalidateViewCache();
     notifyListeners();
   }
 
   void setSort(GrocerySort sort) {
     if (_sort == sort) return;
     _sort = sort;
+    _invalidateViewCache();
     _settings.setSortIndex(sort.index);
     notifyListeners();
   }
@@ -323,7 +348,10 @@ class GroceryProvider extends ChangeNotifier {
   }
 
   void setSearch(String query) {
-    _search = query.trim();
+    final trimmed = query.trim();
+    if (_search == trimmed) return;
+    _search = trimmed;
+    _invalidateViewCache();
     notifyListeners();
   }
 
@@ -334,6 +362,7 @@ class GroceryProvider extends ChangeNotifier {
     _sub?.cancel();
     _sub = null;
     _items = [];
+    _invalidateViewCache();
     _isOffline = false;
     _hasPendingWrites = false;
 
@@ -346,14 +375,55 @@ class GroceryProvider extends ChangeNotifier {
     notifyListeners();
 
     _sub = _service.watchGroceries(householdId).listen((snapshot) {
+      final itemsChanged = !_sameItems(_items, snapshot.items);
+      final flagsChanged = _isOffline != snapshot.isFromCache ||
+          _hasPendingWrites != snapshot.hasPendingWrites;
+      final wasLoading = _loading;
+
       _items = snapshot.items;
       _isOffline = snapshot.isFromCache;
       _hasPendingWrites = snapshot.hasPendingWrites;
       _loading = false;
-      notifyListeners();
-      // Keep expiry reminders in sync with the latest data.
-      _syncReminders();
+
+      if (itemsChanged) _invalidateViewCache();
+
+      // Skip the rebuild entirely when nothing observable changed — e.g. a
+      // metadata-only snapshot (pending-write ack) with identical items.
+      if (itemsChanged || flagsChanged || wasLoading) {
+        notifyListeners();
+      }
+      // Only reschedule reminders when the item set actually changed.
+      if (itemsChanged || wasLoading) {
+        _syncReminders();
+      }
     });
+  }
+
+  /// Shallow structural comparison of two grocery lists: same length, same ids
+  /// in the same order, and same mutable fields that affect the UI.
+  bool _sameItems(List<GroceryItem> a, List<GroceryItem> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      final x = a[i];
+      final y = b[i];
+      if (x.id != y.id ||
+          x.name != y.name ||
+          x.category != y.category ||
+          x.quantity != y.quantity ||
+          x.unit != y.unit ||
+          x.status != y.status ||
+          x.isStaple != y.isStaple ||
+          x.notes != y.notes ||
+          x.imageUrl != y.imageUrl ||
+          x.claimedBy != y.claimedBy ||
+          x.expiryDate != y.expiryDate ||
+          x.purchaseDate != y.purchaseDate ||
+          x.updatedAt != y.updatedAt) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /// Reschedules local expiry reminders to match the current items and the

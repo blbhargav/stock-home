@@ -63,6 +63,11 @@ class GroceryTile extends StatelessWidget {
                         width: 44,
                         height: 44,
                         fit: BoxFit.cover,
+                        // Decode at ~thumbnail resolution (logical 44px at up to
+                        // 3x DPI) instead of the full 1200px upload, saving
+                        // memory and decode time for every row in the list.
+                        cacheWidth: 132,
+                        cacheHeight: 132,
                         loadingBuilder: (context, child, progress) {
                           if (progress == null) return child;
                           return Container(

@@ -225,6 +225,9 @@ class _DetailBody extends StatelessWidget {
                         width: 110,
                         height: 110,
                         fit: BoxFit.cover,
+                        // Thumbnail-res decode (110 logical × 3x DPI).
+                        cacheWidth: 330,
+                        cacheHeight: 330,
                         loadingBuilder: (context, child, progress) =>
                             progress == null
                             ? child

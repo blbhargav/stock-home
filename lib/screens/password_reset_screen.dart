@@ -125,8 +125,9 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
                             ),
                             validator: (v) {
                               final value = v?.trim() ?? '';
-                              if (value.isEmpty)
+                              if (value.isEmpty) {
                                 return 'Please enter your email';
+                              }
                               if (!_emailRegex.hasMatch(value)) {
                                 return 'Enter a valid email address';
                               }

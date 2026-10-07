@@ -9,6 +9,7 @@ import '../providers/auth_provider.dart';
 import '../providers/grocery_provider.dart';
 import '../services/household_service.dart';
 import '../services/product_lookup_service.dart';
+import '../services/speech_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/account_sheet.dart';
 import '../widgets/grocery_tile.dart';
@@ -472,6 +473,7 @@ class _InventoryTab extends StatefulWidget {
 
 class _InventoryTabState extends State<_InventoryTab> {
   final _searchCtrl = TextEditingController();
+  bool _listeningSearch = false;
 
   // Multi-select state.
   bool _selectionMode = false;
@@ -479,8 +481,33 @@ class _InventoryTabState extends State<_InventoryTab> {
 
   @override
   void dispose() {
+    if (_listeningSearch) SpeechService.instance.cancel();
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _toggleSearchDictation(GroceryProvider provider) async {
+    if (_listeningSearch) {
+      await SpeechService.instance.stop();
+      if (mounted) setState(() => _listeningSearch = false);
+      return;
+    }
+    setState(() => _listeningSearch = true);
+    await SpeechService.instance.listen(
+      onResult: (text) {
+        if (!mounted) return;
+        setState(() {
+          _searchCtrl.text = text;
+          _searchCtrl.selection =
+              TextSelection.collapsed(offset: _searchCtrl.text.length);
+        });
+        provider.setSearch(text);
+      },
+    );
+    // When the engine stops on its own (silence), reflect that in the UI.
+    if (mounted && !SpeechService.instance.isListening) {
+      setState(() => _listeningSearch = false);
+    }
   }
 
   void _enterSelection(String id) {
@@ -536,6 +563,16 @@ class _InventoryTabState extends State<_InventoryTab> {
                         setState(() {});
                       },
                     ),
+                  IconButton(
+                    tooltip: _listeningSearch
+                        ? 'Stop listening'
+                        : 'Search by voice',
+                    icon: Icon(
+                      _listeningSearch ? Icons.mic : Icons.mic_none,
+                      color: _listeningSearch ? scheme.primary : null,
+                    ),
+                    onPressed: () => _toggleSearchDictation(provider),
+                  ),
                 ],
                 onChanged: (value) {
                   provider.setSearch(value);
