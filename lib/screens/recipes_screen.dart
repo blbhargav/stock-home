@@ -6,42 +6,36 @@ import '../providers/recipe_provider.dart';
 import 'recipe_cook_screen.dart';
 import 'recipe_edit_screen.dart';
 
-/// Lists built-in and household recipes. Tapping one opens the interactive
-/// cook screen; the FAB creates a new user recipe.
-class RecipesScreen extends StatelessWidget {
-  const RecipesScreen({super.key});
+/// Navigates to the create-recipe screen.
+void openNewRecipe(BuildContext context) {
+  Navigator.of(context)
+      .push(MaterialPageRoute(builder: (_) => const RecipeEditScreen()));
+}
+
+/// The scrollable list of recipes, without a scaffold, so it can be embedded
+/// as a tab inside the home screen.
+class RecipesBody extends StatelessWidget {
+  const RecipesBody({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Recipes')),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.of(context)
-            .push(MaterialPageRoute(builder: (_) => const RecipeEditScreen())),
-        icon: const Icon(Icons.add),
-        label: const Text('New recipe'),
-      ),
-      body: Consumer<RecipeProvider>(
-        builder: (context, provider, _) {
-          if (provider.loading && provider.userRecipes.isEmpty) {
-            // Built-ins still show while user recipes load.
-          }
-          final builtIn = provider.builtInRecipes;
-          final user = provider.userRecipes;
+    return Consumer<RecipeProvider>(
+      builder: (context, provider, _) {
+        final builtIn = provider.builtInRecipes;
+        final user = provider.userRecipes;
 
-          return ListView(
-            padding: const EdgeInsets.only(bottom: 96),
-            children: [
-              if (user.isNotEmpty) ...[
-                const _SectionLabel('Your recipes'),
-                for (final r in user) _RecipeCard(recipe: r),
-              ],
-              const _SectionLabel('Built-in recipes'),
-              for (final r in builtIn) _RecipeCard(recipe: r),
+        return ListView(
+          padding: const EdgeInsets.only(bottom: 96),
+          children: [
+            if (user.isNotEmpty) ...[
+              const _SectionLabel('Your recipes'),
+              for (final r in user) _RecipeCard(recipe: r),
             ],
-          );
-        },
-      ),
+            const _SectionLabel('Built-in recipes'),
+            for (final r in builtIn) _RecipeCard(recipe: r),
+          ],
+        );
+      },
     );
   }
 }

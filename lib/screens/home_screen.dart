@@ -170,7 +170,9 @@ class _HomeScreenState extends State<HomeScreen> {
               ? 'StockHome'
               : _tabIndex == 1
               ? 'Categories'
-              : 'Shopping List',
+              : _tabIndex == 2
+              ? 'Shopping List'
+              : 'Recipes',
         ),
         actions: [
           if (_tabIndex == 2)
@@ -206,7 +208,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ? const _InventoryTab()
                 : _tabIndex == 1
                 ? const CategoriesTab()
-                : const ShoppingListTab(),
+                : _tabIndex == 2
+                ? const ShoppingListTab()
+                : const RecipesBody(),
           ),
         ],
       ),
@@ -214,12 +218,20 @@ class _HomeScreenState extends State<HomeScreen> {
         onPressed: () {
           if (_tabIndex == 2) {
             _quickAddToList(context);
+          } else if (_tabIndex == 3) {
+            openNewRecipe(context);
           } else {
             _openForm(context);
           }
         },
         icon: const Icon(Icons.add),
-        label: Text(_tabIndex == 2 ? 'Quick add' : 'Add'),
+        label: Text(
+          _tabIndex == 2
+              ? 'Quick add'
+              : _tabIndex == 3
+              ? 'New recipe'
+              : 'Add',
+        ),
       ),
       bottomNavigationBar: Consumer<GroceryProvider>(
         builder: (context, provider, _) {
@@ -245,6 +257,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 selectedIcon: const Icon(Icons.shopping_cart),
                 label: 'Shopping',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.menu_book_outlined),
+                selectedIcon: Icon(Icons.menu_book),
+                label: 'Recipes',
               ),
             ],
           );
@@ -295,8 +312,6 @@ class _HomeScreenState extends State<HomeScreen> {
           .push(MaterialPageRoute(builder: (_) => const ActivityFeedScreen())),
       onRecipeImport: () => Navigator.of(context)
           .push(MaterialPageRoute(builder: (_) => const RecipeImportScreen())),
-      onRecipes: () => Navigator.of(context)
-          .push(MaterialPageRoute(builder: (_) => const RecipesScreen())),
     );
 
     // Keep the messenger reference used to avoid using context after await.
