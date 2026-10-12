@@ -23,11 +23,20 @@ class _RecipeCookScreenState extends State<RecipeCookScreen> {
   Set<String> _selected = {};
   bool _initialized = false;
 
+  /// Steps the user has ticked off while cooking. Tracked by step text (not
+  /// index) so completion survives the dynamic rebuild when ingredients change.
+  /// Session-only — never persisted.
+  final Set<String> _doneSteps = {};
+
   void _initSelection(Recipe recipe) {
     if (_initialized) return;
     _selected = recipe.defaultSelection;
     _initialized = true;
   }
+
+  /// Stable key for a cook step's done-state, combining prep flag + text so a
+  /// prep step and a base step with the same wording don't collide.
+  String _stepKey(CookStep s) => '${s.isPrep ? 'p' : 's'}:${s.text}';
 
   Future<void> _addMissingToList(BuildContext context, Recipe recipe) async {
     final grocery = context.read<GroceryProvider>();
@@ -140,7 +149,9 @@ class _RecipeCookScreenState extends State<RecipeCookScreen> {
               _SectionHeader(
                 icon: Icons.format_list_numbered,
                 title: 'Method',
-                subtitle: '${steps.length} steps',
+                subtitle: steps.isEmpty
+                    ? '0 steps'
+                    : '${steps.where((s) => _doneSteps.contains(_stepKey(s))).length} of ${steps.length} done',
               ),
               if (steps.isEmpty)
                 const Padding(
@@ -149,7 +160,15 @@ class _RecipeCookScreenState extends State<RecipeCookScreen> {
                 )
               else
                 for (var i = 0; i < steps.length; i++)
-                  _StepTile(number: i + 1, step: steps[i]),
+                  _StepTile(
+                    number: i + 1,
+                    step: steps[i],
+                    done: _doneSteps.contains(_stepKey(steps[i])),
+                    onToggle: () => setState(() {
+                      final key = _stepKey(steps[i]);
+                      if (!_doneSteps.add(key)) _doneSteps.remove(key);
+                    }),
+                  ),
             ],
           ),
         );
@@ -271,52 +290,74 @@ class _Pill extends StatelessWidget {
 }
 
 class _StepTile extends StatelessWidget {
-  const _StepTile({required this.number, required this.step});
+  const _StepTile({
+    required this.number,
+    required this.step,
+    required this.done,
+    required this.onToggle,
+  });
 
   final int number;
   final CookStep step;
+  final bool done;
+  final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final color = step.isPrep ? scheme.tertiary : scheme.primary;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 14,
-            backgroundColor: color.withValues(alpha: 0.15),
-            child: Text(
-              '$number',
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-              ),
+
+    return InkWell(
+      onTap: onToggle,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Tappable status circle: step number, or a check when done.
+            CircleAvatar(
+              radius: 14,
+              backgroundColor: done
+                  ? scheme.primary
+                  : color.withValues(alpha: 0.15),
+              child: done
+                  ? const Icon(Icons.check, size: 16, color: Colors.white)
+                  : Text(
+                      '$number',
+                      style: TextStyle(
+                        color: color,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (step.isPrep)
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (step.isPrep)
+                    Text(
+                      'PREP',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: done ? scheme.onSurfaceVariant : color,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1,
+                      ),
+                    ),
                   Text(
-                    'PREP',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: color,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1,
+                    step.text,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      decoration: done ? TextDecoration.lineThrough : null,
+                      color: done ? scheme.onSurfaceVariant : null,
                     ),
                   ),
-                Text(step.text, style: theme.textTheme.bodyMedium),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
