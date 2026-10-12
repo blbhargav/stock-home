@@ -49,6 +49,10 @@ service cloud.firestore {
       match /purchases/{purchaseId} {
         allow read, write: if isMember(householdId);
       }
+
+      match /recipes/{recipeId} {
+        allow read, write: if isMember(householdId);
+      }
     }
 
     function household(householdId) {

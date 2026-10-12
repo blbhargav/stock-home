@@ -22,6 +22,7 @@ import 'insights_screen.dart';
 import 'household_setup_screen.dart';
 import 'members_screen.dart';
 import 'recipe_import_screen.dart';
+import 'recipes_screen.dart';
 
 /// Main screen: grocery inventory with filters plus a shopping-list tab.
 class HomeScreen extends StatefulWidget {
@@ -294,6 +295,8 @@ class _HomeScreenState extends State<HomeScreen> {
           .push(MaterialPageRoute(builder: (_) => const ActivityFeedScreen())),
       onRecipeImport: () => Navigator.of(context)
           .push(MaterialPageRoute(builder: (_) => const RecipeImportScreen())),
+      onRecipes: () => Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => const RecipesScreen())),
     );
 
     // Keep the messenger reference used to avoid using context after await.

@@ -51,6 +51,7 @@ Future<void> showAccountSheet(
   VoidCallback? onInsights,
   VoidCallback? onActivity,
   VoidCallback? onRecipeImport,
+  VoidCallback? onRecipes,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -69,6 +70,7 @@ Future<void> showAccountSheet(
       onInsights: onInsights,
       onActivity: onActivity,
       onRecipeImport: onRecipeImport,
+      onRecipes: onRecipes,
     ),
   );
 }
@@ -83,6 +85,7 @@ class _AccountSheet extends StatelessWidget {
     this.onInsights,
     this.onActivity,
     this.onRecipeImport,
+    this.onRecipes,
   });
 
   final AccountInfo info;
@@ -93,6 +96,7 @@ class _AccountSheet extends StatelessWidget {
   final VoidCallback? onInsights;
   final VoidCallback? onActivity;
   final VoidCallback? onRecipeImport;
+  final VoidCallback? onRecipes;
 
   /// Copies the household code, closes the sheet, then shows a floating
   /// SnackBar (a SnackBar belongs to the underlying Scaffold and would
@@ -439,6 +443,14 @@ class _AccountSheet extends StatelessWidget {
             onTap: () {
               Navigator.of(context).pop();
               onActivity?.call();
+            },
+          ),
+          _ActionTile(
+            icon: Icons.menu_book,
+            label: 'Recipes',
+            onTap: () {
+              Navigator.of(context).pop();
+              onRecipes?.call();
             },
           ),
           _ActionTile(

@@ -376,7 +376,8 @@ class GroceryProvider extends ChangeNotifier {
 
     _sub = _service.watchGroceries(householdId).listen((snapshot) {
       final itemsChanged = !_sameItems(_items, snapshot.items);
-      final flagsChanged = _isOffline != snapshot.isFromCache ||
+      final flagsChanged =
+          _isOffline != snapshot.isFromCache ||
           _hasPendingWrites != snapshot.hasPendingWrites;
       final wasLoading = _loading;
 

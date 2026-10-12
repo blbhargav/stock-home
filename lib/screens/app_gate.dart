@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
 import '../providers/grocery_provider.dart';
+import '../providers/recipe_provider.dart';
 import '../services/notification_service.dart';
 import 'auth_screen.dart';
 import 'home_screen.dart';
@@ -50,6 +51,7 @@ class _AppGateState extends State<AppGate> {
         // user reaches the main screen.
         WidgetsBinding.instance.addPostFrameCallback((_) {
           context.read<GroceryProvider>().bindHousehold(auth.householdId);
+          context.read<RecipeProvider>().bindHousehold(auth.householdId);
         });
         _requestNotificationPermissionOnce();
 

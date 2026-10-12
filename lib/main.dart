@@ -8,6 +8,7 @@ import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
 import 'providers/grocery_provider.dart';
 import 'providers/locale_provider.dart';
+import 'providers/recipe_provider.dart';
 import 'providers/theme_provider.dart';
 import 'screens/app_gate.dart';
 import 'services/notification_service.dart';
@@ -41,6 +42,7 @@ class StockHomeApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => GroceryProvider()),
+        ChangeNotifierProvider(create: (_) => RecipeProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => LocaleProvider()),
       ],
