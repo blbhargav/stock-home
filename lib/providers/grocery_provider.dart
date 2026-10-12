@@ -132,6 +132,24 @@ class GroceryProvider extends ChangeNotifier {
 
   List<GroceryItem> get allItems => List.unmodifiable(_items);
 
+  /// Finds the inventory item that best matches a free-text ingredient [name],
+  /// or null if none. Uses the same case-insensitive contains-either-way
+  /// matching as the recipe/shopping-list ingredient checks. Prefers an exact
+  /// (case-insensitive) name match, then any fuzzy match.
+  GroceryItem? findInventoryMatch(String name) {
+    final lower = name.trim().toLowerCase();
+    if (lower.isEmpty) return null;
+    GroceryItem? fuzzy;
+    for (final item in _items) {
+      final n = item.name.toLowerCase();
+      if (n == lower) return item; // exact wins immediately
+      if (fuzzy == null && (n.contains(lower) || lower.contains(n))) {
+        fuzzy = item;
+      }
+    }
+    return fuzzy;
+  }
+
   /// Returns distinct, non-empty notes from all current items, ordered by
   /// frequency (most used first). Useful for note suggestions.
   List<String> get recentNotes {

@@ -3,11 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/grocery_item.dart';
 import '../models/recipe.dart';
 import '../providers/auth_provider.dart';
 import '../providers/grocery_provider.dart';
 import '../providers/recipe_provider.dart';
 import '../services/notification_service.dart';
+import '../theme/app_theme.dart';
+import 'item_detail_screen.dart';
 import 'recipe_edit_screen.dart';
 
 /// Interactive cooking screen. The user ticks the ingredients they're using;
@@ -292,6 +295,19 @@ class _IngredientTile extends StatelessWidget {
     final scheme = theme.colorScheme;
     final amount = ingredient.amountLabel;
 
+    // Link this ingredient to a matching inventory item, if any.
+    final match = context.watch<GroceryProvider>().findInventoryMatch(
+      ingredient.name,
+    );
+
+    final prepText =
+        (ingredient.prep != null && ingredient.prep!.trim().isNotEmpty)
+        ? 'needs ${ingredient.prep}'
+        : null;
+    final subtitleText = match == null
+        ? [prepText, 'not in inventory'].whereType<String>().join(' · ')
+        : prepText;
+
     return CheckboxListTile(
       value: selected,
       onChanged: (v) => onChanged(v ?? false),
@@ -315,9 +331,62 @@ class _IngredientTile extends StatelessWidget {
           ],
         ],
       ),
-      subtitle: (ingredient.prep != null && ingredient.prep!.trim().isNotEmpty)
-          ? Text('needs ${ingredient.prep}')
+      subtitle: (subtitleText != null && subtitleText.isNotEmpty)
+          ? Text(subtitleText)
           : null,
+      // Trailing: a tappable chip linking to where the item lives in inventory.
+      secondary: match == null
+          ? null
+          : _InventoryLink(
+              item: match,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ItemDetailScreen(itemId: match.id),
+                ),
+              ),
+            ),
+    );
+  }
+}
+
+/// A small tappable chip showing a matched inventory item's status; opens its
+/// detail screen (where it's stored, photos, notes, etc.).
+class _InventoryLink extends StatelessWidget {
+  const _InventoryLink({required this.item, required this.onTap});
+
+  final GroceryItem item;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = AppTheme.statusColor(item.status);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(99),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(color: color.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.inventory_2_outlined, size: 13, color: color),
+            const SizedBox(width: 4),
+            Text(
+              item.status.label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+            Icon(Icons.chevron_right, size: 14, color: color),
+          ],
+        ),
+      ),
     );
   }
 }
