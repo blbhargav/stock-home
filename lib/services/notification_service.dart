@@ -181,6 +181,38 @@ class NotificationService {
     await _plugin.cancelAll();
   }
 
+  static const _timerChannelId = 'cook_timers';
+  static const int _timerNotificationId = 778001;
+
+  NotificationDetails get _timerDetails => const NotificationDetails(
+    android: AndroidNotificationDetails(
+      _timerChannelId,
+      'Cooking timers',
+      channelDescription: 'Alerts when a recipe step timer finishes.',
+      importance: Importance.max,
+      priority: Priority.high,
+      playSound: true,
+      enableVibration: true,
+    ),
+    iOS: DarwinNotificationDetails(),
+    macOS: DarwinNotificationDetails(),
+  );
+
+  /// Shows an immediate notification when a step's cooking timer finishes.
+  Future<void> showTimerComplete(String stepText) async {
+    await init();
+    try {
+      await _plugin.show(
+        id: _timerNotificationId,
+        title: 'Timer done',
+        body: stepText,
+        notificationDetails: _timerDetails,
+      );
+    } catch (e) {
+      debugPrint('Failed to show timer notification: $e');
+    }
+  }
+
   // Fixed id for the recurring daily digest so it can be updated/cancelled.
   static const int _digestId = 777001;
 

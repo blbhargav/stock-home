@@ -74,6 +74,7 @@ Recipe recipeFromMap(String id, Map<String, dynamic> data) {
               ((map['requiresIngredients'] as List?) ?? const [])
                   .whereType<String>()
                   .toList(),
+          timerSeconds: (map['timerSeconds'] as num?)?.toInt(),
         );
       })
       .where((s) => s.text.isNotEmpty)
@@ -112,7 +113,11 @@ Map<String, dynamic> recipeToMap(Recipe r) {
         .toList(),
     'steps': r.steps
         .map(
-          (s) => {'text': s.text, 'requiresIngredients': s.requiresIngredients},
+          (s) => {
+            'text': s.text,
+            'requiresIngredients': s.requiresIngredients,
+            'timerSeconds': s.timerSeconds,
+          },
         )
         .toList(),
   };

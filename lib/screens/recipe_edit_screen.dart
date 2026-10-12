@@ -325,22 +325,38 @@ class _IngredientDraft {
 }
 
 class _StepDraft {
-  _StepDraft({String text = '', Set<String>? requires})
+  _StepDraft({String text = '', Set<String>? requires, int? timerSeconds})
     : textCtrl = TextEditingController(text: text),
+      minutesCtrl = TextEditingController(
+        text: (timerSeconds != null && timerSeconds > 0)
+            ? (timerSeconds ~/ 60).toString()
+            : '',
+      ),
       requires = requires ?? {};
 
-  factory _StepDraft.fromModel(RecipeStep s) =>
-      _StepDraft(text: s.text, requires: s.requiresIngredients.toSet());
-
-  final TextEditingController textCtrl;
-  final Set<String> requires;
-
-  RecipeStep toModel(Set<String> validIds) => RecipeStep(
-    text: textCtrl.text.trim(),
-    requiresIngredients: requires.where(validIds.contains).toList(),
+  factory _StepDraft.fromModel(RecipeStep s) => _StepDraft(
+    text: s.text,
+    requires: s.requiresIngredients.toSet(),
+    timerSeconds: s.timerSeconds,
   );
 
-  void dispose() => textCtrl.dispose();
+  final TextEditingController textCtrl;
+  final TextEditingController minutesCtrl;
+  final Set<String> requires;
+
+  RecipeStep toModel(Set<String> validIds) {
+    final mins = int.tryParse(minutesCtrl.text.trim());
+    return RecipeStep(
+      text: textCtrl.text.trim(),
+      requiresIngredients: requires.where(validIds.contains).toList(),
+      timerSeconds: (mins != null && mins > 0) ? mins * 60 : null,
+    );
+  }
+
+  void dispose() {
+    textCtrl.dispose();
+    minutesCtrl.dispose();
+  }
 }
 
 class _IngredientEditor extends StatelessWidget {
@@ -458,6 +474,28 @@ class _StepEditor extends StatelessWidget {
                   tooltip: 'Remove',
                   icon: const Icon(Icons.close),
                   onPressed: onRemove,
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                SizedBox(
+                  width: 110,
+                  child: TextFormField(
+                    controller: draft.minutesCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Timer (min)',
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Optional. Leave blank to auto-detect from the step text.',
+                    style: TextStyle(fontSize: 11),
+                  ),
                 ),
               ],
             ),

@@ -66,6 +66,7 @@ const List<Recipe> kBuiltInRecipes = [
       ),
       RecipeStep(
         text: 'Cover and cook on low, stirring occasionally, until the potatoes are tender (about 12–15 min).',
+        timerSeconds: 780,
       ),
       RecipeStep(
         text: 'Garnish with chopped coriander leaves before serving.',

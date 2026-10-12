@@ -66,13 +66,21 @@ class RecipeIngredient {
 /// in [requiresIngredients] has been selected by the user. Steps with no
 /// requirements always show.
 class RecipeStep {
-  const RecipeStep({required this.text, this.requiresIngredients = const []});
+  const RecipeStep({
+    required this.text,
+    this.requiresIngredients = const [],
+    this.timerSeconds,
+  });
 
   final String text;
 
   /// Ingredient ids this step depends on. If any is unselected (e.g. an
   /// optional ingredient the user skipped), the step is omitted.
   final List<String> requiresIngredients;
+
+  /// Explicit timer duration in seconds set by the recipe author. When null,
+  /// a duration may still be auto-detected from [text] via [stepTimerSeconds].
+  final int? timerSeconds;
 }
 
 /// A recipe: its ingredients and the ordered base steps. Prep steps are not
@@ -132,12 +140,15 @@ class Recipe {
 /// A step shown to the cook: either an auto-generated prep step or one of the
 /// recipe's base steps that survived the ingredient filter.
 class CookStep {
-  const CookStep({required this.text, required this.isPrep});
+  const CookStep({required this.text, required this.isPrep, this.timerSeconds});
 
   final String text;
 
   /// True for auto-generated "chop the onion" style preparation steps.
   final bool isPrep;
+
+  /// Timer duration for this step in seconds, if any (explicit or detected).
+  final int? timerSeconds;
 }
 
 /// Builds the ordered cook steps for a recipe given the user's selected
@@ -167,11 +178,46 @@ List<CookStep> buildCookSteps(Recipe recipe, Set<String> selectedIds) {
   for (final step in recipe.steps) {
     final allPresent = step.requiresIngredients.every(selectedIds.contains);
     if (allPresent) {
-      steps.add(CookStep(text: step.text, isPrep: false));
+      steps.add(
+        CookStep(
+          text: step.text,
+          isPrep: false,
+          timerSeconds: stepTimerSeconds(step),
+        ),
+      );
     }
   }
 
   return steps;
+}
+
+/// Resolves a step's timer duration in seconds: the author's explicit value if
+/// set, otherwise a best-effort parse of a duration mentioned in the step text
+/// (e.g. "cook for 5 minutes", "simmer 90 seconds", "rest for 1 hour"). Returns
+/// null when no duration is found. For ranges like "12–15 min", the lower bound
+/// is used.
+int? stepTimerSeconds(RecipeStep step) {
+  if (step.timerSeconds != null && step.timerSeconds! > 0) {
+    return step.timerSeconds;
+  }
+  return parseDurationSeconds(step.text);
+}
+
+/// Pure duration parser. Finds the first `number unit` in [text] where unit
+/// is hour(s)/hr, minute(s)/min, or second(s)/sec. Handles ranges ("12-15 min")
+/// by taking the first number. Returns seconds, or null if none found.
+int? parseDurationSeconds(String text) {
+  final match = RegExp(
+    r'(\d+)\s*(?:[–\-]\s*\d+\s*)?(hours?|hrs?|minutes?|mins?|seconds?|secs?)',
+    caseSensitive: false,
+  ).firstMatch(text);
+  if (match == null) return null;
+  final value = int.tryParse(match.group(1) ?? '');
+  if (value == null || value <= 0) return null;
+  final unit = (match.group(2) ?? '').toLowerCase();
+  if (unit.startsWith('h')) return value * 3600;
+  if (unit.startsWith('m')) return value * 60;
+  return value; // seconds
 }
 
 String _capitalize(String s) =>

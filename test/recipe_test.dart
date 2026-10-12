@@ -137,4 +137,66 @@ void main() {
       expect(restored.ingredients.first.optional, isFalse);
     });
   });
+
+  group('step timers', () {
+    test('parseDurationSeconds handles minutes, seconds, hours', () {
+      expect(parseDurationSeconds('cook for 5 minutes'), 300);
+      expect(parseDurationSeconds('simmer 90 seconds'), 90);
+      expect(parseDurationSeconds('rest for 1 hour'), 3600);
+      expect(parseDurationSeconds('fry 2 min'), 120);
+      expect(parseDurationSeconds('wait 30 sec'), 30);
+    });
+
+    test('parseDurationSeconds takes the lower bound of a range', () {
+      expect(parseDurationSeconds('cook for 12-15 min'), 720);
+      expect(parseDurationSeconds('about 12–15 minutes'), 720); // en dash
+    });
+
+    test('parseDurationSeconds returns null when no duration present', () {
+      expect(parseDurationSeconds('stir well and serve'), isNull);
+      expect(parseDurationSeconds(''), isNull);
+    });
+
+    test('stepTimerSeconds prefers explicit value over text', () {
+      const step = RecipeStep(text: 'cook for 5 minutes', timerSeconds: 600);
+      expect(stepTimerSeconds(step), 600);
+    });
+
+    test('stepTimerSeconds falls back to parsing the text', () {
+      const step = RecipeStep(text: 'cook for 5 minutes');
+      expect(stepTimerSeconds(step), 300);
+    });
+
+    test('cook steps carry a timer, prep steps do not', () {
+      const recipe = Recipe(
+        id: 'r',
+        name: 'Timed',
+        ingredients: [
+          RecipeIngredient(id: 'rice', name: 'Rice', prep: 'rinsed'),
+        ],
+        steps: [
+          RecipeStep(
+            text: 'Boil for 10 minutes.',
+            requiresIngredients: ['rice'],
+          ),
+        ],
+      );
+      final steps = buildCookSteps(recipe, {'rice'});
+      final prep = steps.firstWhere((s) => s.isPrep);
+      final cook = steps.firstWhere((s) => !s.isPrep);
+      expect(prep.timerSeconds, isNull);
+      expect(cook.timerSeconds, 600);
+    });
+
+    test('timerSeconds survives a serialization round-trip', () {
+      const original = Recipe(
+        id: 'r',
+        name: 'T',
+        ingredients: [RecipeIngredient(id: 'a', name: 'A')],
+        steps: [RecipeStep(text: 'Step', timerSeconds: 420)],
+      );
+      final restored = recipeFromMap('r', recipeToMap(original));
+      expect(restored.steps.first.timerSeconds, 420);
+    });
+  });
 }

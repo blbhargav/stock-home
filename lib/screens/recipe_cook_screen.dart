@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -5,6 +7,7 @@ import '../models/recipe.dart';
 import '../providers/auth_provider.dart';
 import '../providers/grocery_provider.dart';
 import '../providers/recipe_provider.dart';
+import '../services/notification_service.dart';
 import 'recipe_edit_screen.dart';
 
 /// Interactive cooking screen. The user ticks the ingredients they're using;
@@ -27,6 +30,52 @@ class _RecipeCookScreenState extends State<RecipeCookScreen> {
   /// index) so completion survives the dynamic rebuild when ingredients change.
   /// Session-only — never persisted.
   final Set<String> _doneSteps = {};
+
+  /// Active countdowns, keyed by step key → remaining seconds.
+  final Map<String, int> _remaining = {};
+  final Map<String, Timer> _timers = {};
+
+  @override
+  void dispose() {
+    for (final t in _timers.values) {
+      t.cancel();
+    }
+    super.dispose();
+  }
+
+  void _startTimer(String key, int seconds, String stepText) {
+    _timers[key]?.cancel();
+    setState(() => _remaining[key] = seconds);
+    _timers[key] = Timer.periodic(const Duration(seconds: 1), (timer) {
+      final left = (_remaining[key] ?? 0) - 1;
+      if (left <= 0) {
+        timer.cancel();
+        _timers.remove(key);
+        if (mounted) {
+          setState(() => _remaining.remove(key));
+        }
+        NotificationService.instance.showTimerComplete(stepText);
+        if (mounted) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              SnackBar(
+                behavior: SnackBarBehavior.floating,
+                content: Text('Timer done: $stepText'),
+              ),
+            );
+        }
+      } else {
+        if (mounted) setState(() => _remaining[key] = left);
+      }
+    });
+  }
+
+  void _cancelTimer(String key) {
+    _timers[key]?.cancel();
+    _timers.remove(key);
+    setState(() => _remaining.remove(key));
+  }
 
   void _initSelection(Recipe recipe) {
     if (_initialized) return;
@@ -164,10 +213,19 @@ class _RecipeCookScreenState extends State<RecipeCookScreen> {
                     number: i + 1,
                     step: steps[i],
                     done: _doneSteps.contains(_stepKey(steps[i])),
+                    remainingSeconds: _remaining[_stepKey(steps[i])],
                     onToggle: () => setState(() {
                       final key = _stepKey(steps[i]);
                       if (!_doneSteps.add(key)) _doneSteps.remove(key);
                     }),
+                    onStartTimer: () {
+                      final s = steps[i];
+                      final secs = s.timerSeconds;
+                      if (secs != null && secs > 0) {
+                        _startTimer(_stepKey(s), secs, s.text);
+                      }
+                    },
+                    onCancelTimer: () => _cancelTimer(_stepKey(steps[i])),
                   ),
             ],
           ),
@@ -294,19 +352,47 @@ class _StepTile extends StatelessWidget {
     required this.number,
     required this.step,
     required this.done,
+    required this.remainingSeconds,
     required this.onToggle,
+    required this.onStartTimer,
+    required this.onCancelTimer,
   });
 
   final int number;
   final CookStep step;
   final bool done;
+  final int? remainingSeconds;
   final VoidCallback onToggle;
+  final VoidCallback onStartTimer;
+  final VoidCallback onCancelTimer;
+
+  String _fmt(int seconds) {
+    final m = seconds ~/ 60;
+    final s = seconds % 60;
+    return '$m:${s.toString().padLeft(2, '0')}';
+  }
+
+  String _fmtDuration(int seconds) {
+    if (seconds >= 3600) {
+      final h = seconds ~/ 3600;
+      final m = (seconds % 3600) ~/ 60;
+      return m > 0 ? '${h}h ${m}m' : '${h}h';
+    }
+    if (seconds >= 60) {
+      final m = seconds ~/ 60;
+      final s = seconds % 60;
+      return s > 0 ? '${m}m ${s}s' : '${m}m';
+    }
+    return '${seconds}s';
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final color = step.isPrep ? scheme.tertiary : scheme.primary;
+    final running = remainingSeconds != null;
+    final hasTimer = (step.timerSeconds ?? 0) > 0;
 
     return InkWell(
       onTap: onToggle,
@@ -353,7 +439,74 @@ class _StepTile extends StatelessWidget {
                       color: done ? scheme.onSurfaceVariant : null,
                     ),
                   ),
+                  if (hasTimer) ...[
+                    const SizedBox(height: 6),
+                    if (running)
+                      _TimerChip(
+                        label: _fmt(remainingSeconds!),
+                        icon: Icons.stop_circle_outlined,
+                        active: true,
+                        onTap: onCancelTimer,
+                      )
+                    else
+                      _TimerChip(
+                        label:
+                            'Start ${_fmtDuration(step.timerSeconds!)} timer',
+                        icon: Icons.timer_outlined,
+                        active: false,
+                        onTap: onStartTimer,
+                      ),
+                  ],
                 ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TimerChip extends StatelessWidget {
+  const _TimerChip({
+    required this.label,
+    required this.icon,
+    required this.active,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final color = active ? scheme.error : scheme.primary;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(99),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(color: color.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w700,
+                fontFeatures: active
+                    ? const [FontFeature.tabularFigures()]
+                    : null,
               ),
             ),
           ],
