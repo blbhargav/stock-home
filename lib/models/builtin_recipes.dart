@@ -55,10 +55,12 @@ const List<Recipe> kBuiltInRecipes = [
       RecipeStep(
         text: 'Add the cumin seeds and let them splutter.',
         requiresIngredients: ['cumin'],
+        timerSeconds: 15,
       ),
       RecipeStep(
         text: 'Add the slit green chilli and sauté for a few seconds.',
         requiresIngredients: ['green_chilli'],
+        timerSeconds: 10,
       ),
       RecipeStep(
         text: 'Add the potatoes, turmeric and salt. Toss to coat.',
@@ -66,7 +68,7 @@ const List<Recipe> kBuiltInRecipes = [
       ),
       RecipeStep(
         text: 'Cover and cook on low, stirring occasionally, until the potatoes are tender (about 12–15 min).',
-        timerSeconds: 780,
+        timerSeconds: 20,
       ),
       RecipeStep(
         text: 'Garnish with chopped coriander leaves before serving.',
@@ -138,8 +140,12 @@ const List<Recipe> kBuiltInRecipes = [
       ),
       RecipeStep(
         text: 'Pour in the egg mixture, spread evenly, and cook until the base sets.',
+        timerSeconds: 15,
       ),
-      RecipeStep(text: 'Flip and cook the other side for a minute. Serve hot.'),
+      RecipeStep(
+        text: 'Flip and cook the other side for a minute. Serve hot.',
+        timerSeconds: 10,
+      ),
     ],
   ),
 ];
