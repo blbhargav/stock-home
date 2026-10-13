@@ -70,6 +70,7 @@ class RecipeStep {
     required this.text,
     this.requiresIngredients = const [],
     this.timerSeconds,
+    this.optional = false,
   });
 
   final String text;
@@ -81,6 +82,10 @@ class RecipeStep {
   /// Explicit timer duration in seconds set by the recipe author. When null,
   /// a duration may still be auto-detected from [text] via [stepTimerSeconds].
   final int? timerSeconds;
+
+  /// When true, the step is marked "Optional" in the method — it's shown but
+  /// flagged so the cook knows they can skip it.
+  final bool optional;
 }
 
 /// A recipe: its ingredients and the ordered base steps. Prep steps are not
@@ -140,7 +145,12 @@ class Recipe {
 /// A step shown to the cook: either an auto-generated prep step or one of the
 /// recipe's base steps that survived the ingredient filter.
 class CookStep {
-  const CookStep({required this.text, required this.isPrep, this.timerSeconds});
+  const CookStep({
+    required this.text,
+    required this.isPrep,
+    this.timerSeconds,
+    this.optional = false,
+  });
 
   final String text;
 
@@ -149,6 +159,9 @@ class CookStep {
 
   /// Timer duration for this step in seconds, if any (explicit or detected).
   final int? timerSeconds;
+
+  /// True when this is an author-marked optional step (shown with a badge).
+  final bool optional;
 }
 
 /// Builds the ordered cook steps for a recipe given the user's selected
@@ -183,6 +196,7 @@ List<CookStep> buildCookSteps(Recipe recipe, Set<String> selectedIds) {
           text: step.text,
           isPrep: false,
           timerSeconds: stepTimerSeconds(step),
+          optional: step.optional,
         ),
       );
     }

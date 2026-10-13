@@ -199,4 +199,56 @@ void main() {
       expect(restored.steps.first.timerSeconds, 420);
     });
   });
+
+  group('optional steps', () {
+    test(
+      'optional flag propagates into cook steps; prep steps are not optional',
+      () {
+        const recipe = Recipe(
+          id: 'r',
+          name: 'Opt',
+          ingredients: [
+            RecipeIngredient(id: 'rice', name: 'Rice', prep: 'rinsed'),
+          ],
+          steps: [
+            RecipeStep(text: 'Boil the rice.', requiresIngredients: ['rice']),
+            RecipeStep(text: 'Garnish before serving.', optional: true),
+          ],
+        );
+        final steps = buildCookSteps(recipe, {'rice'});
+        final prep = steps.firstWhere((s) => s.isPrep);
+        final garnish = steps.firstWhere((s) => s.text.startsWith('Garnish'));
+        final boil = steps.firstWhere((s) => s.text.startsWith('Boil'));
+        expect(prep.optional, isFalse);
+        expect(boil.optional, isFalse);
+        expect(garnish.optional, isTrue);
+      },
+    );
+
+    test('optional steps are still shown (always visible)', () {
+      const recipe = Recipe(
+        id: 'r',
+        name: 'Opt',
+        ingredients: [RecipeIngredient(id: 'a', name: 'A')],
+        steps: [RecipeStep(text: 'Optional garnish.', optional: true)],
+      );
+      final steps = buildCookSteps(recipe, {'a'});
+      expect(steps.where((s) => s.text == 'Optional garnish.').length, 1);
+    });
+
+    test('step optional survives a serialization round-trip', () {
+      const original = Recipe(
+        id: 'r',
+        name: 'T',
+        ingredients: [RecipeIngredient(id: 'a', name: 'A')],
+        steps: [
+          RecipeStep(text: 'Required step'),
+          RecipeStep(text: 'Optional step', optional: true),
+        ],
+      );
+      final restored = recipeFromMap('r', recipeToMap(original));
+      expect(restored.steps[0].optional, isFalse);
+      expect(restored.steps[1].optional, isTrue);
+    });
+  });
 }

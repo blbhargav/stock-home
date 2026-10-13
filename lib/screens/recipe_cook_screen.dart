@@ -947,6 +947,28 @@ class _StepCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 3),
                         ],
+                        if (step.optional) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: scheme.secondaryContainer,
+                              borderRadius: BorderRadius.circular(99),
+                            ),
+                            child: Text(
+                              'OPTIONAL',
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.8,
+                                color: scheme.onSecondaryContainer,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                        ],
                         AnimatedDefaultTextStyle(
                           duration: const Duration(milliseconds: 200),
                           style: theme.textTheme.bodyMedium!.copyWith(

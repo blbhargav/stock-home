@@ -146,6 +146,10 @@ const List<Recipe> kBuiltInRecipes = [
         text: 'Flip and cook the other side for a minute. Serve hot.',
         timerSeconds: 10,
       ),
+      RecipeStep(
+        text: 'Serve with toast or ketchup on the side.',
+        optional: true,
+      ),
     ],
   ),
 ];

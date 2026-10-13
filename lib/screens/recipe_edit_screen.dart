@@ -578,24 +578,30 @@ class _IngredientDraft {
 }
 
 class _StepDraft {
-  _StepDraft({String text = '', Set<String>? requires, int? timerSeconds})
-    : textCtrl = TextEditingController(text: text),
-      minutesCtrl = TextEditingController(
-        text: (timerSeconds != null && timerSeconds > 0)
-            ? (timerSeconds ~/ 60).toString()
-            : '',
-      ),
-      requires = requires ?? {};
+  _StepDraft({
+    String text = '',
+    Set<String>? requires,
+    int? timerSeconds,
+    this.optional = false,
+  }) : textCtrl = TextEditingController(text: text),
+       minutesCtrl = TextEditingController(
+         text: (timerSeconds != null && timerSeconds > 0)
+             ? (timerSeconds ~/ 60).toString()
+             : '',
+       ),
+       requires = requires ?? {};
 
   factory _StepDraft.fromModel(RecipeStep s) => _StepDraft(
     text: s.text,
     requires: s.requiresIngredients.toSet(),
     timerSeconds: s.timerSeconds,
+    optional: s.optional,
   );
 
   final TextEditingController textCtrl;
   final TextEditingController minutesCtrl;
   final Set<String> requires;
+  bool optional;
 
   RecipeStep toModel(Set<String> validIds) {
     final mins = int.tryParse(minutesCtrl.text.trim());
@@ -603,6 +609,7 @@ class _StepDraft {
       text: textCtrl.text.trim(),
       requiresIngredients: requires.where(validIds.contains).toList(),
       timerSeconds: (mins != null && mins > 0) ? mins * 60 : null,
+      optional: optional,
     );
   }
 
@@ -711,12 +718,17 @@ class _IngredientCard extends StatelessWidget {
   }
 }
 
-/// Themed optional-ingredient toggle whose tint changes when enabled.
+/// Themed optional toggle whose tint changes when enabled.
 class _OptionalToggle extends StatefulWidget {
-  const _OptionalToggle({required this.value, required this.onChanged});
+  const _OptionalToggle({
+    required this.value,
+    required this.onChanged,
+    this.label = 'Optional ingredient',
+  });
 
   final bool value;
   final ValueChanged<bool> onChanged;
+  final String label;
 
   @override
   State<_OptionalToggle> createState() => _OptionalToggleState();
@@ -745,7 +757,7 @@ class _OptionalToggleState extends State<_OptionalToggle> {
           ),
           const SizedBox(width: 8),
           Text(
-            'Optional ingredient',
+            widget.label,
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w500,
@@ -864,6 +876,12 @@ class _StepCard extends StatelessWidget {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  _OptionalToggle(
+                    label: 'Optional step',
+                    value: draft.optional,
+                    onChanged: (v) => draft.optional = v,
                   ),
                   if (named.isNotEmpty) ...[
                     const SizedBox(height: 10),
