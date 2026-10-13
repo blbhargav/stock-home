@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/grocery_item.dart';
@@ -16,6 +17,10 @@ import 'recipe_edit_screen.dart';
 /// Interactive cooking screen. The user ticks the ingredients they're using;
 /// the method below updates live — prep steps appear for ingredients that need
 /// preprocessing, and steps for unticked optional ingredients are hidden.
+///
+/// Steps can be ticked off (session-only, tracked by content so it survives the
+/// dynamic rebuild) and steps with a duration expose an inline countdown timer
+/// that fires a local notification on completion.
 class RecipeCookScreen extends StatefulWidget {
   const RecipeCookScreen({super.key, required this.recipeId});
 
@@ -29,7 +34,7 @@ class _RecipeCookScreenState extends State<RecipeCookScreen> {
   Set<String> _selected = {};
   bool _initialized = false;
 
-  /// Steps the user has ticked off while cooking. Tracked by step text (not
+  /// Steps the user has ticked off while cooking. Tracked by step key (not
   /// index) so completion survives the dynamic rebuild when ingredients change.
   /// Session-only — never persisted.
   final Set<String> _doneSteps = {};
@@ -46,6 +51,16 @@ class _RecipeCookScreenState extends State<RecipeCookScreen> {
     super.dispose();
   }
 
+  void _initSelection(Recipe recipe) {
+    if (_initialized) return;
+    _selected = recipe.defaultSelection;
+    _initialized = true;
+  }
+
+  /// Stable key for a cook step's done/timer state, combining prep flag + text
+  /// so a prep step and a base step with the same wording don't collide.
+  String _stepKey(CookStep s) => '${s.isPrep ? 'p' : 's'}:${s.text}';
+
   void _startTimer(String key, int seconds, String stepText) {
     _timers[key]?.cancel();
     setState(() => _remaining[key] = seconds);
@@ -54,10 +69,9 @@ class _RecipeCookScreenState extends State<RecipeCookScreen> {
       if (left <= 0) {
         timer.cancel();
         _timers.remove(key);
-        if (mounted) {
-          setState(() => _remaining.remove(key));
-        }
+        if (mounted) setState(() => _remaining.remove(key));
         NotificationService.instance.showTimerComplete(stepText);
+        HapticFeedback.vibrate();
         if (mounted) {
           ScaffoldMessenger.of(context)
             ..hideCurrentSnackBar()
@@ -80,22 +94,29 @@ class _RecipeCookScreenState extends State<RecipeCookScreen> {
     setState(() => _remaining.remove(key));
   }
 
-  void _initSelection(Recipe recipe) {
-    if (_initialized) return;
-    _selected = recipe.defaultSelection;
-    _initialized = true;
+  void _toggleStep(CookStep step) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      final key = _stepKey(step);
+      if (!_doneSteps.add(key)) _doneSteps.remove(key);
+    });
   }
 
-  /// Stable key for a cook step's done-state, combining prep flag + text so a
-  /// prep step and a base step with the same wording don't collide.
-  String _stepKey(CookStep s) => '${s.isPrep ? 'p' : 's'}:${s.text}';
+  void _toggleIngredient(String id, bool selected) {
+    setState(() {
+      if (selected) {
+        _selected.add(id);
+      } else {
+        _selected.remove(id);
+      }
+    });
+  }
 
   Future<void> _addMissingToList(BuildContext context, Recipe recipe) async {
     final grocery = context.read<GroceryProvider>();
     final who = context.read<AuthProvider>().resolvedDisplayName;
     final messenger = ScaffoldMessenger.of(context);
 
-    // Names of selected ingredients, matched against current in-stock items.
     final selectedNames = recipe.ingredients
         .where((i) => _selected.contains(i.id))
         .map((i) => i.name)
@@ -123,6 +144,20 @@ class _RecipeCookScreenState extends State<RecipeCookScreen> {
       );
   }
 
+  /// Whether any selected ingredient is missing from inventory (no match or
+  /// needs purchase) — drives the shopping-list button's enabled state.
+  bool _hasMissing(BuildContext context, Recipe recipe) {
+    final grocery = context.read<GroceryProvider>();
+    for (final ing in recipe.ingredients) {
+      if (!_selected.contains(ing.id)) continue;
+      final match = grocery.findInventoryMatch(ing.name);
+      if (match == null || match.status == GroceryStatus.needsPurchase) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<RecipeProvider>(
@@ -137,449 +172,1027 @@ class _RecipeCookScreenState extends State<RecipeCookScreen> {
         _initSelection(recipe);
 
         final steps = buildCookSteps(recipe, _selected);
-        final theme = Theme.of(context);
-        final scheme = theme.colorScheme;
+        final scheme = Theme.of(context).colorScheme;
+        final doneCount = steps
+            .where((s) => _doneSteps.contains(_stepKey(s)))
+            .length;
 
         return Scaffold(
-          appBar: AppBar(
-            title: Text(recipe.name),
-            actions: [
-              if (!recipe.isBuiltIn)
-                IconButton(
-                  tooltip: 'Edit recipe',
-                  icon: const Icon(Icons.edit_outlined),
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => RecipeEditScreen(existing: recipe),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          body: ListView(
-            padding: const EdgeInsets.only(bottom: 32),
-            children: [
-              if (recipe.description != null &&
-                  recipe.description!.trim().isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: Text(
-                    recipe.description!,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
+          extendBodyBehindAppBar: true,
+          appBar: _buildAppBar(context, recipe, scheme),
+          body: CustomScrollView(
+            slivers: [
+              _HeroHeader(recipe: recipe),
 
-              _SectionHeader(
-                icon: Icons.checklist,
-                title: 'Ingredients',
-                subtitle: 'Tick what you\'re using',
+              SliverToBoxAdapter(
+                child: _ProgressBanner(done: doneCount, total: steps.length),
               ),
-              for (final ing in recipe.ingredients)
-                _IngredientTile(
-                  ingredient: ing,
-                  selected: _selected.contains(ing.id),
-                  onChanged: (v) => setState(() {
-                    if (v) {
-                      _selected.add(ing.id);
-                    } else {
-                      _selected.remove(ing.id);
-                    }
-                  }),
-                ),
 
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: OutlinedButton.icon(
+              SliverToBoxAdapter(
+                child: _SectionHeader(
+                  icon: Icons.checklist_rounded,
+                  title: 'Ingredients',
+                  subtitle: 'Tap to select what you\'re using',
+                ),
+              ),
+
+              SliverList.separated(
+                itemCount: recipe.ingredients.length,
+                separatorBuilder: (_, _) => Divider(
+                  height: 1,
+                  indent: 72,
+                  endIndent: 20,
+                  color: scheme.outlineVariant.withValues(alpha: 0.35),
+                ),
+                itemBuilder: (context, i) {
+                  final ing = recipe.ingredients[i];
+                  final match = context
+                      .watch<GroceryProvider>()
+                      .findInventoryMatch(ing.name);
+                  return _IngredientRow(
+                    ingredient: ing,
+                    isSelected: _selected.contains(ing.id),
+                    match: match,
+                    onToggle: () =>
+                        _toggleIngredient(ing.id, !_selected.contains(ing.id)),
+                    onOpenInventory: match == null
+                        ? null
+                        : () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  ItemDetailScreen(itemId: match.id),
+                            ),
+                          ),
+                  );
+                },
+              ),
+
+              SliverToBoxAdapter(
+                child: _ShoppingListButton(
+                  hasMissing: _hasMissing(context, recipe),
                   onPressed: () => _addMissingToList(context, recipe),
-                  icon: const Icon(Icons.add_shopping_cart),
-                  label: const Text('Add missing to shopping list'),
                 ),
               ),
 
-              _SectionHeader(
-                icon: Icons.format_list_numbered,
-                title: 'Method',
-                subtitle: steps.isEmpty
-                    ? '0 steps'
-                    : '${steps.where((s) => _doneSteps.contains(_stepKey(s))).length} of ${steps.length} done',
+              SliverToBoxAdapter(
+                child: _SectionHeader(
+                  icon: Icons.menu_book_rounded,
+                  title: 'Method',
+                  subtitle: steps.isEmpty
+                      ? 'Select ingredients to see the steps'
+                      : '$doneCount of ${steps.length} done',
+                  trailing: steps.isNotEmpty && doneCount == steps.length
+                      ? const _DoneAllBadge()
+                      : null,
+                ),
               ),
+
               if (steps.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text('Select some ingredients to see the steps.'),
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Text('Select some ingredients to see the steps.'),
+                  ),
                 )
               else
-                for (var i = 0; i < steps.length; i++)
-                  _StepTile(
-                    number: i + 1,
-                    step: steps[i],
-                    done: _doneSteps.contains(_stepKey(steps[i])),
-                    remainingSeconds: _remaining[_stepKey(steps[i])],
-                    onToggle: () => setState(() {
-                      final key = _stepKey(steps[i]);
-                      if (!_doneSteps.add(key)) _doneSteps.remove(key);
-                    }),
-                    onStartTimer: () {
-                      final s = steps[i];
-                      final secs = s.timerSeconds;
-                      if (secs != null && secs > 0) {
-                        _startTimer(_stepKey(s), secs, s.text);
-                      }
-                    },
-                    onCancelTimer: () => _cancelTimer(_stepKey(steps[i])),
-                  ),
+                SliverList.builder(
+                  itemCount: steps.length,
+                  itemBuilder: (context, index) {
+                    final step = steps[index];
+                    final key = _stepKey(step);
+                    final secs = step.timerSeconds;
+                    return _StepCard(
+                      number: index + 1,
+                      step: step,
+                      isDone: _doneSteps.contains(key),
+                      remaining: _remaining[key],
+                      isTimerRunning: _timers.containsKey(key),
+                      onTap: () => _toggleStep(step),
+                      onStartTimer: (secs != null && secs > 0)
+                          ? () => _startTimer(key, secs, step.text)
+                          : null,
+                      onCancelTimer: () => _cancelTimer(key),
+                    );
+                  },
+                ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 40)),
             ],
           ),
         );
       },
     );
   }
+
+  PreferredSizeWidget _buildAppBar(
+    BuildContext context,
+    Recipe recipe,
+    ColorScheme scheme,
+  ) {
+    Widget circle(IconData icon) => Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: scheme.surface.withValues(alpha: 0.85),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(icon, size: 18, color: scheme.onSurface),
+    );
+
+    return AppBar(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      leading: IconButton(
+        tooltip: 'Back',
+        icon: circle(Icons.arrow_back),
+        onPressed: () => Navigator.maybePop(context),
+      ),
+      actions: [
+        if (!recipe.isBuiltIn)
+          IconButton(
+            tooltip: 'Edit recipe',
+            icon: circle(Icons.edit_outlined),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => RecipeEditScreen(existing: recipe),
+              ),
+            ),
+          ),
+        const SizedBox(width: 8),
+      ],
+    );
+  }
 }
+
+// ---------------------------------------------------------------------------
+// Hero header
+// ---------------------------------------------------------------------------
+
+class _HeroHeader extends StatelessWidget {
+  const _HeroHeader({required this.recipe});
+
+  final Recipe recipe;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return SliverToBoxAdapter(
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              scheme.primaryContainer,
+              scheme.secondaryContainer.withValues(alpha: 0.6),
+              scheme.surface,
+            ],
+            stops: const [0.0, 0.55, 1.0],
+          ),
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 64, 20, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: scheme.primary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(99),
+                    border: Border.all(
+                      color: scheme.primary.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Text(
+                    recipe.isBuiltIn ? 'Built-in recipe' : 'My recipe',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
+                      color: scheme.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  recipe.name,
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: scheme.onSurface,
+                    letterSpacing: -0.5,
+                    height: 1.15,
+                  ),
+                ),
+                if (recipe.description != null &&
+                    recipe.description!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    recipe.description!,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+                if (recipe.servings != null) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: scheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.people_alt_outlined,
+                          size: 16,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${recipe.servings} serving${recipe.servings! > 1 ? 's' : ''}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Progress banner
+// ---------------------------------------------------------------------------
+
+class _ProgressBanner extends StatelessWidget {
+  const _ProgressBanner({required this.done, required this.total});
+
+  final int done;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final progress = total == 0 ? 0.0 : done / total;
+    final allDone = done == total && total > 0;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: allDone
+            ? scheme.primaryContainer
+            : scheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: allDone
+              ? scheme.primary.withValues(alpha: 0.4)
+              : scheme.outlineVariant.withValues(alpha: 0.4),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                allDone ? Icons.check_circle_rounded : Icons.timer_outlined,
+                size: 18,
+                color: allDone ? scheme.primary : scheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                allDone
+                    ? 'All done — enjoy your meal!'
+                    : total == 0
+                    ? 'No steps yet'
+                    : '$done of $total steps done',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: allDone ? scheme.primary : scheme.onSurface,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${(progress * 100).round()}%',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: allDone ? scheme.primary : scheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: progress),
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeOut,
+              builder: (_, val, _) => LinearProgressIndicator(
+                value: val,
+                minHeight: 6,
+                backgroundColor: scheme.outlineVariant.withValues(alpha: 0.3),
+                color: scheme.primary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Section header
+// ---------------------------------------------------------------------------
 
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({
     required this.icon,
     required this.title,
-    required this.subtitle,
+    this.subtitle,
+    this.trailing,
   });
 
   final IconData icon;
   final String title;
-  final String subtitle;
+  final String? subtitle;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: scheme.primary),
-          const SizedBox(width: 8),
-          Text(
-            title,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: scheme.primaryContainer,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 18, color: scheme.primary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: scheme.onSurface,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                if (subtitle != null)
+                  Text(
+                    subtitle!,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: scheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+              ],
             ),
           ),
-          const SizedBox(width: 8),
-          Text(
-            subtitle,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: scheme.onSurfaceVariant,
-            ),
-          ),
+          ?trailing,
         ],
       ),
     );
   }
 }
 
-class _IngredientTile extends StatelessWidget {
-  const _IngredientTile({
+// ---------------------------------------------------------------------------
+// Ingredient row
+// ---------------------------------------------------------------------------
+
+class _IngredientRow extends StatelessWidget {
+  const _IngredientRow({
     required this.ingredient,
-    required this.selected,
-    required this.onChanged,
+    required this.isSelected,
+    required this.match,
+    required this.onToggle,
+    this.onOpenInventory,
   });
 
   final RecipeIngredient ingredient;
-  final bool selected;
-  final ValueChanged<bool> onChanged;
+  final bool isSelected;
+  final GroceryItem? match;
+  final VoidCallback onToggle;
+  final VoidCallback? onOpenInventory;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final amount = ingredient.amountLabel;
+    final ing = ingredient;
+    final qtyStr = ing.amountLabel;
 
-    // Link this ingredient to a matching inventory item, if any.
-    final match = context.watch<GroceryProvider>().findInventoryMatch(
-      ingredient.name,
-    );
-
-    final prepText =
-        (ingredient.prep != null && ingredient.prep!.trim().isNotEmpty)
-        ? 'needs ${ingredient.prep}'
-        : null;
-    final subtitleText = match == null
-        ? [prepText, 'not in inventory'].whereType<String>().join(' · ')
-        : prepText;
-
-    return CheckboxListTile(
-      value: selected,
-      onChanged: (v) => onChanged(v ?? false),
-      controlAffinity: ListTileControlAffinity.leading,
-      dense: true,
-      title: Row(
-        children: [
-          Flexible(child: Text(ingredient.name)),
-          if (amount.isNotEmpty) ...[
-            const SizedBox(width: 8),
-            Text(
-              amount,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
+    return Semantics(
+      label:
+          '${ing.name}${qtyStr.isNotEmpty ? ', $qtyStr' : ''}'
+          '${ing.optional ? ', optional' : ''}. '
+          '${isSelected ? 'Selected' : 'Not selected'}.',
+      child: InkWell(
+        onTap: onToggle,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
+          child: Row(
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: isSelected ? scheme.primary : Colors.transparent,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isSelected ? scheme.primary : scheme.outlineVariant,
+                    width: 1.8,
+                  ),
+                ),
+                child: isSelected
+                    ? Icon(
+                        Icons.check_rounded,
+                        size: 15,
+                        color: scheme.onPrimary,
+                      )
+                    : null,
               ),
-            ),
-          ],
-          if (ingredient.optional) ...[
-            const SizedBox(width: 8),
-            _Pill(label: 'Optional', color: scheme.tertiary),
-          ],
-        ],
-      ),
-      subtitle: (subtitleText != null && subtitleText.isNotEmpty)
-          ? Text(subtitleText)
-          : null,
-      // Trailing: a tappable chip linking to where the item lives in inventory.
-      secondary: match == null
-          ? null
-          : _InventoryLink(
-              item: match,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => ItemDetailScreen(itemId: match.id),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            ing.name,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: isSelected
+                                  ? scheme.onSurface
+                                  : scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                        if (qtyStr.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            qtyStr,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: scheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                        if (ing.optional) ...[
+                          const SizedBox(width: 8),
+                          const _OptionalBadge(),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        if (ing.prep != null && ing.prep!.trim().isNotEmpty)
+                          _PrepHint(text: 'needs ${ing.prep}'),
+                        if (match != null)
+                          _InventoryChip(
+                            status: match!.status,
+                            onTap: onOpenInventory,
+                          )
+                        else
+                          Text(
+                            'not in inventory',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: scheme.onSurfaceVariant.withValues(
+                                alpha: 0.6,
+                              ),
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            ),
-    );
-  }
-}
-
-/// A small tappable chip showing a matched inventory item's status; opens its
-/// detail screen (where it's stored, photos, notes, etc.).
-class _InventoryLink extends StatelessWidget {
-  const _InventoryLink({required this.item, required this.onTap});
-
-  final GroceryItem item;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = AppTheme.statusColor(item.status);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(99),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(99),
-          border: Border.all(color: color.withValues(alpha: 0.4)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.inventory_2_outlined, size: 13, color: color),
-            const SizedBox(width: 4),
-            Text(
-              item.status.label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: color,
-              ),
-            ),
-            Icon(Icons.chevron_right, size: 14, color: color),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _Pill extends StatelessWidget {
-  const _Pill({required this.label, required this.color});
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(99),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
-      ),
-    );
-  }
-}
-
-class _StepTile extends StatelessWidget {
-  const _StepTile({
-    required this.number,
-    required this.step,
-    required this.done,
-    required this.remainingSeconds,
-    required this.onToggle,
-    required this.onStartTimer,
-    required this.onCancelTimer,
-  });
-
-  final int number;
-  final CookStep step;
-  final bool done;
-  final int? remainingSeconds;
-  final VoidCallback onToggle;
-  final VoidCallback onStartTimer;
-  final VoidCallback onCancelTimer;
-
-  String _fmt(int seconds) {
-    final m = seconds ~/ 60;
-    final s = seconds % 60;
-    return '$m:${s.toString().padLeft(2, '0')}';
-  }
-
-  String _fmtDuration(int seconds) {
-    if (seconds >= 3600) {
-      final h = seconds ~/ 3600;
-      final m = (seconds % 3600) ~/ 60;
-      return m > 0 ? '${h}h ${m}m' : '${h}h';
-    }
-    if (seconds >= 60) {
-      final m = seconds ~/ 60;
-      final s = seconds % 60;
-      return s > 0 ? '${m}m ${s}s' : '${m}m';
-    }
-    return '${seconds}s';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final color = step.isPrep ? scheme.tertiary : scheme.primary;
-    final running = remainingSeconds != null;
-    final hasTimer = (step.timerSeconds ?? 0) > 0;
-
-    return InkWell(
-      onTap: onToggle,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Tappable status circle: step number, or a check when done.
-            CircleAvatar(
-              radius: 14,
-              backgroundColor: done
-                  ? scheme.primary
-                  : color.withValues(alpha: 0.15),
-              child: done
-                  ? const Icon(Icons.check, size: 16, color: Colors.white)
-                  : Text(
-                      '$number',
-                      style: TextStyle(
-                        color: color,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (step.isPrep)
-                    Text(
-                      'PREP',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: done ? scheme.onSurfaceVariant : color,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  Text(
-                    step.text,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      decoration: done ? TextDecoration.lineThrough : null,
-                      color: done ? scheme.onSurfaceVariant : null,
-                    ),
-                  ),
-                  if (hasTimer) ...[
-                    const SizedBox(height: 6),
-                    if (running)
-                      _TimerChip(
-                        label: _fmt(remainingSeconds!),
-                        icon: Icons.stop_circle_outlined,
-                        active: true,
-                        onTap: onCancelTimer,
-                      )
-                    else
-                      _TimerChip(
-                        label:
-                            'Start ${_fmtDuration(step.timerSeconds!)} timer',
-                        icon: Icons.timer_outlined,
-                        active: false,
-                        onTap: onStartTimer,
-                      ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TimerChip extends StatelessWidget {
-  const _TimerChip({
-    required this.label,
-    required this.icon,
-    required this.active,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool active;
-  final VoidCallback onTap;
+class _OptionalBadge extends StatelessWidget {
+  const _OptionalBadge();
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final color = active ? scheme.error : scheme.primary;
-    return InkWell(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: scheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Text(
+        'Optional',
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: scheme.onSecondaryContainer,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+}
+
+class _PrepHint extends StatelessWidget {
+  const _PrepHint({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.cut_outlined,
+          size: 11,
+          color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+        ),
+        const SizedBox(width: 3),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 11,
+            color: scheme.onSurfaceVariant.withValues(alpha: 0.75),
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Tappable chip showing a matched inventory item's status; opens its detail.
+class _InventoryChip extends StatelessWidget {
+  const _InventoryChip({required this.status, this.onTap});
+
+  final GroceryStatus status;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = AppTheme.statusColor(status);
+    final icon = switch (status) {
+      GroceryStatus.inStock => Icons.check_circle_outline_rounded,
+      GroceryStatus.runningLow => Icons.warning_amber_rounded,
+      GroceryStatus.needsPurchase => Icons.add_shopping_cart_rounded,
+      GroceryStatus.purchased => Icons.shopping_bag_outlined,
+    };
+
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(99),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
+          color: color.withValues(alpha: 0.13),
           borderRadius: BorderRadius.circular(99),
-          border: Border.all(color: color.withValues(alpha: 0.4)),
+          border: Border.all(color: color.withValues(alpha: 0.35)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: color),
-            const SizedBox(width: 6),
+            Icon(icon, size: 11, color: color),
+            const SizedBox(width: 3),
             Text(
-              label,
+              status.label,
               style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w600,
                 color: color,
-                fontWeight: FontWeight.w700,
-                fontFeatures: active
-                    ? const [FontFeature.tabularFigures()]
-                    : null,
               ),
             ),
+            if (onTap != null) const SizedBox(width: 2),
+            if (onTap != null)
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 11,
+                color: color.withValues(alpha: 0.7),
+              ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Shopping list button
+// ---------------------------------------------------------------------------
+
+class _ShoppingListButton extends StatelessWidget {
+  const _ShoppingListButton({
+    required this.hasMissing,
+    required this.onPressed,
+  });
+
+  final bool hasMissing;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+      child: FilledButton.tonalIcon(
+        onPressed: hasMissing ? onPressed : null,
+        style: FilledButton.styleFrom(
+          minimumSize: const Size.fromHeight(52),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          backgroundColor: hasMissing
+              ? scheme.primaryContainer
+              : scheme.surfaceContainerHighest,
+          foregroundColor: hasMissing
+              ? scheme.onPrimaryContainer
+              : scheme.onSurfaceVariant,
+        ),
+        icon: const Icon(Icons.add_shopping_cart_rounded, size: 20),
+        label: Text(
+          hasMissing
+              ? 'Add missing to shopping list'
+              : 'All ingredients in stock',
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Step card
+// ---------------------------------------------------------------------------
+
+class _StepCard extends StatelessWidget {
+  const _StepCard({
+    required this.number,
+    required this.step,
+    required this.isDone,
+    required this.onTap,
+    this.remaining,
+    this.isTimerRunning = false,
+    this.onStartTimer,
+    this.onCancelTimer,
+  });
+
+  final int number;
+  final CookStep step;
+  final bool isDone;
+  final VoidCallback onTap;
+  final int? remaining;
+  final bool isTimerRunning;
+  final VoidCallback? onStartTimer;
+  final VoidCallback? onCancelTimer;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isPrep = step.isPrep;
+    final hasTimer = (step.timerSeconds ?? 0) > 0;
+
+    return Semantics(
+      label:
+          'Step $number. ${isPrep ? 'Prep. ' : ''}${step.text}. '
+          '${isDone ? 'Done' : 'Not done'}.',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+        child: Material(
+          color: isDone
+              ? scheme.surfaceContainerHighest.withValues(alpha: 0.45)
+              : scheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _StepBubble(number: number, isDone: isDone, isPrep: isPrep),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (isPrep) ...[
+                          Text(
+                            'PREP',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.2,
+                              color: scheme.tertiary,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                        ],
+                        AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 200),
+                          style: theme.textTheme.bodyMedium!.copyWith(
+                            color: isDone
+                                ? scheme.onSurfaceVariant.withValues(alpha: 0.5)
+                                : scheme.onSurface,
+                            decoration: isDone
+                                ? TextDecoration.lineThrough
+                                : TextDecoration.none,
+                            decorationColor: scheme.onSurfaceVariant,
+                            height: 1.45,
+                          ),
+                          child: Text(step.text),
+                        ),
+                        if (hasTimer && !isDone) ...[
+                          const SizedBox(height: 10),
+                          _TimerRow(
+                            seconds: step.timerSeconds!,
+                            remaining: remaining,
+                            isRunning: isTimerRunning,
+                            onStart: onStartTimer,
+                            onCancel: onCancelTimer,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StepBubble extends StatelessWidget {
+  const _StepBubble({
+    required this.number,
+    required this.isDone,
+    required this.isPrep,
+  });
+
+  final int number;
+  final bool isDone;
+  final bool isPrep;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final accent = isPrep ? scheme.tertiary : scheme.primary;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: isDone
+            ? scheme.primary
+            : accent.withValues(alpha: isPrep ? 0.18 : 0.15),
+        border: isDone
+            ? null
+            : Border.all(color: accent.withValues(alpha: 0.4), width: 1.5),
+      ),
+      child: Center(
+        child: isDone
+            ? Icon(Icons.check_rounded, size: 16, color: scheme.onPrimary)
+            : Text(
+                '$number',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: accent,
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+class _TimerRow extends StatelessWidget {
+  const _TimerRow({
+    required this.seconds,
+    required this.isRunning,
+    this.remaining,
+    this.onStart,
+    this.onCancel,
+  });
+
+  final int seconds;
+  final int? remaining;
+  final bool isRunning;
+  final VoidCallback? onStart;
+  final VoidCallback? onCancel;
+
+  String _fmt(int s) {
+    final m = s ~/ 60;
+    final sec = s % 60;
+    return '$m:${sec.toString().padLeft(2, '0')}';
+  }
+
+  String _fmtDuration(int s) {
+    if (s >= 3600) {
+      final h = s ~/ 3600;
+      final m = (s % 3600) ~/ 60;
+      return m > 0 ? '${h}h ${m}m' : '${h}h';
+    }
+    if (s >= 60) {
+      final m = s ~/ 60;
+      final sec = s % 60;
+      return sec > 0 ? '${m}m ${sec}s' : '${m}m';
+    }
+    return '${s}s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    if (!isRunning) {
+      return GestureDetector(
+        onTap: onStart,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+          decoration: BoxDecoration(
+            color: scheme.primaryContainer,
+            borderRadius: BorderRadius.circular(99),
+            border: Border.all(color: scheme.primary.withValues(alpha: 0.25)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.timer_outlined, size: 14, color: scheme.primary),
+              const SizedBox(width: 5),
+              Text(
+                'Start ${_fmtDuration(seconds)} timer',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: scheme.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final rem = remaining ?? seconds;
+    final progress = seconds == 0 ? 0.0 : 1.0 - (rem / seconds);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 38,
+          height: 38,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: progress),
+                duration: const Duration(milliseconds: 800),
+                builder: (_, val, _) => CircularProgressIndicator(
+                  value: val,
+                  strokeWidth: 3,
+                  backgroundColor: scheme.outlineVariant.withValues(alpha: 0.3),
+                  color: scheme.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          _fmt(rem),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: scheme.primary,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+        const SizedBox(width: 10),
+        GestureDetector(
+          onTap: onCancel,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: scheme.errorContainer,
+              borderRadius: BorderRadius.circular(99),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.close_rounded,
+                  size: 12,
+                  color: scheme.onErrorContainer,
+                ),
+                const SizedBox(width: 3),
+                Text(
+                  'Cancel',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onErrorContainer,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DoneAllBadge extends StatelessWidget {
+  const _DoneAllBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: scheme.primaryContainer,
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.check_circle_rounded, size: 14, color: scheme.primary),
+          const SizedBox(width: 4),
+          Text(
+            'All done!',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: scheme.primary,
+            ),
+          ),
+        ],
       ),
     );
   }
