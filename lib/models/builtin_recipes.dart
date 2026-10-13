@@ -11,6 +11,8 @@ const List<Recipe> kBuiltInRecipes = [
     name: 'Aloo Jeera',
     description: 'Simple cumin-spiced potatoes.',
     servings: 2,
+    category: 'Side dish',
+    tags: ['quick', 'vegetarian'],
     isBuiltIn: true,
     ingredients: [
       RecipeIngredient(
@@ -81,6 +83,8 @@ const List<Recipe> kBuiltInRecipes = [
     name: 'Masala Omelette',
     description: 'A spiced Indian-style omelette.',
     servings: 1,
+    category: 'Breakfast',
+    tags: ['quick', 'egg'],
     isBuiltIn: true,
     ingredients: [
       RecipeIngredient(id: 'eggs', name: 'Eggs', quantity: '2'),

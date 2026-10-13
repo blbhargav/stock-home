@@ -4,23 +4,47 @@ import 'package:flutter/foundation.dart';
 
 import '../models/builtin_recipes.dart';
 import '../models/recipe.dart';
+import '../models/recipe_history.dart';
 import '../services/recipe_service.dart';
+import '../services/settings_service.dart';
 
 /// Exposes the combined list of built-in and household (user) recipes, and
 /// mutations for user recipes. Mirrors GroceryProvider's household binding.
 class RecipeProvider extends ChangeNotifier {
-  RecipeProvider({RecipeService? service})
-    : _service = service ?? RecipeService();
+  RecipeProvider({RecipeService? service, SettingsService? settings})
+    : _service = service ?? RecipeService(),
+      _settings = settings ?? SettingsService() {
+    _loadFavorites();
+  }
 
   final RecipeService _service;
+  final SettingsService _settings;
 
   String? _householdId;
   StreamSubscription<List<Recipe>>? _sub;
+  StreamSubscription<List<RecipeHistoryEntry>>? _historySub;
 
   List<Recipe> _userRecipes = [];
+  List<RecipeHistoryEntry> _history = [];
+  final Set<String> _favoriteIds = {};
   bool _loading = false;
 
   bool get loading => _loading;
+  List<RecipeHistoryEntry> get recentHistory => List.unmodifiable(_history);
+  bool isFavorite(String recipeId) => _favoriteIds.contains(recipeId);
+
+  Future<void> _loadFavorites() async {
+    _favoriteIds
+      ..clear()
+      ..addAll(await _settings.getFavoriteRecipeIds());
+    notifyListeners();
+  }
+
+  Future<void> toggleFavorite(String recipeId) async {
+    if (!_favoriteIds.add(recipeId)) _favoriteIds.remove(recipeId);
+    notifyListeners();
+    await _settings.setFavoriteRecipeIds(_favoriteIds);
+  }
 
   /// Built-in recipes first, then the household's user recipes.
   List<Recipe> get recipes => [...kBuiltInRecipes, ..._userRecipes];
@@ -40,8 +64,11 @@ class RecipeProvider extends ChangeNotifier {
     if (_householdId == householdId) return;
     _householdId = householdId;
     _sub?.cancel();
+    _historySub?.cancel();
     _sub = null;
+    _historySub = null;
     _userRecipes = [];
+    _history = [];
 
     if (householdId == null) {
       _loading = false;
@@ -55,6 +82,10 @@ class RecipeProvider extends ChangeNotifier {
     _sub = _service.watchRecipes(householdId).listen((list) {
       _userRecipes = list;
       _loading = false;
+      notifyListeners();
+    });
+    _historySub = _service.watchHistory(householdId).listen((list) {
+      _history = list;
       notifyListeners();
     });
   }
@@ -80,6 +111,8 @@ class RecipeProvider extends ChangeNotifier {
       steps: source.steps,
       isBuiltIn: false,
       createdBy: createdBy,
+      category: source.category,
+      tags: source.tags,
     );
     return _service.addRecipe(id, copy);
   }
@@ -96,9 +129,20 @@ class RecipeProvider extends ChangeNotifier {
     await _service.deleteRecipe(id, recipeId);
   }
 
+  Future<void> recordCooked(Recipe recipe, {String? cookedBy}) async {
+    final id = _householdId;
+    if (id == null) return;
+    await _service.recordCooked(
+      householdId: id,
+      recipe: recipe,
+      cookedBy: cookedBy,
+    );
+  }
+
   @override
   void dispose() {
     _sub?.cancel();
+    _historySub?.cancel();
     super.dispose();
   }
 }

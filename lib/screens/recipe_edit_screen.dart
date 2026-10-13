@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../models/recipe.dart';
 import '../providers/auth_provider.dart';
 import '../providers/recipe_provider.dart';
+import '../services/recipe_service.dart';
 import '../services/storage_service.dart';
 
 /// Create or edit a household (user) recipe. Built-in recipes are read-only and
@@ -32,6 +33,8 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _descCtrl;
   late final TextEditingController _servingsCtrl;
+  late final TextEditingController _categoryCtrl;
+  late final TextEditingController _tagsCtrl;
 
   final List<_IngredientDraft> _ingredients = [];
   final List<_StepDraft> _steps = [];
@@ -51,6 +54,8 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
     _nameCtrl = TextEditingController(text: r?.name ?? '');
     _descCtrl = TextEditingController(text: r?.description ?? '');
     _servingsCtrl = TextEditingController(text: r?.servings?.toString() ?? '');
+    _categoryCtrl = TextEditingController(text: r?.category ?? 'Other');
+    _tagsCtrl = TextEditingController(text: r?.tags.join(', ') ?? '');
     _imageUrl = r?.imageUrl;
 
     if (r != null) {
@@ -72,6 +77,8 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
     _nameCtrl.dispose();
     _descCtrl.dispose();
     _servingsCtrl.dispose();
+    _categoryCtrl.dispose();
+    _tagsCtrl.dispose();
     for (final i in _ingredients) {
       i.dispose();
     }
@@ -199,6 +206,12 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
         .where((s) => s.textCtrl.text.trim().isNotEmpty)
         .map((s) => s.toModel(validIds))
         .toList();
+    final tags = _tagsCtrl.text
+        .split(',')
+        .map((tag) => tag.trim().toLowerCase())
+        .where((tag) => tag.isNotEmpty)
+        .toSet()
+        .toList();
 
     // Resolve the hero image: upload a newly picked one, keep/clear existing.
     String? imageUrl = _removeImage ? null : _imageUrl;
@@ -236,6 +249,11 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
       isBuiltIn: false,
       createdBy: widget.existing?.createdBy ?? who,
       imageUrl: imageUrl,
+      category: _categoryCtrl.text.trim().isEmpty
+          ? 'Other'
+          : _categoryCtrl.text.trim(),
+      tags: tags,
+      updatedAt: widget.existing?.updatedAt,
     );
 
     try {
@@ -248,8 +266,11 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _saving = false);
+        final message = e is RecipeConflictException
+            ? 'This recipe changed elsewhere. Close and reopen it before saving.'
+            : 'Could not save recipe: $e';
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Could not save recipe: $e')));
+            .showSnackBar(SnackBar(content: Text(message)));
       }
     }
   }
@@ -436,6 +457,28 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
                 if (n == null || n <= 0) return 'Enter a valid number';
                 return null;
               },
+            ),
+            const SizedBox(height: 10),
+            TextFormField(
+              controller: _categoryCtrl,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Category',
+                hintText: 'e.g. Breakfast, Curry, Snack',
+                prefixIcon: Icon(Icons.category_outlined),
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextFormField(
+              controller: _tagsCtrl,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Tags (optional)',
+                hintText: 'quick, vegetarian, spicy',
+                prefixIcon: Icon(Icons.sell_outlined),
+                border: OutlineInputBorder(),
+              ),
             ),
 
             const SizedBox(height: 28),

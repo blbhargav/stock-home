@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:stockhome/models/builtin_recipes.dart';
 import 'package:stockhome/models/recipe.dart';
+import 'package:stockhome/models/recipe_history.dart';
 import 'package:stockhome/providers/recipe_provider.dart';
 import 'package:stockhome/services/recipe_service.dart';
 
@@ -32,6 +34,17 @@ class _FakeRecipeService implements RecipeService {
   }
 
   @override
+  Stream<List<RecipeHistoryEntry>> watchHistory(String householdId) =>
+      const Stream<List<RecipeHistoryEntry>>.empty();
+
+  @override
+  Future<void> recordCooked({
+    required String householdId,
+    required Recipe recipe,
+    String? cookedBy,
+  }) async {}
+
+  @override
   Future<void> updateRecipe(String householdId, Recipe recipe) async {
     updateCount++;
   }
@@ -43,6 +56,9 @@ class _FakeRecipeService implements RecipeService {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  SharedPreferences.setMockInitialValues({});
+
   group('RecipeProvider', () {
     late _FakeRecipeService fake;
     late RecipeProvider provider;

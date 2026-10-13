@@ -30,9 +30,11 @@ class RecipeCookScreen extends StatefulWidget {
   State<RecipeCookScreen> createState() => _RecipeCookScreenState();
 }
 
-class _RecipeCookScreenState extends State<RecipeCookScreen> {
+class _RecipeCookScreenState extends State<RecipeCookScreen>
+    with WidgetsBindingObserver {
   Set<String> _selected = {};
   bool _initialized = false;
+  int _servings = 1;
 
   /// Steps the user has ticked off while cooking. Tracked by step key (not
   /// index) so completion survives the dynamic rebuild when ingredients change.
@@ -42,9 +44,24 @@ class _RecipeCookScreenState extends State<RecipeCookScreen> {
   /// Active countdowns, keyed by step key → remaining seconds.
   final Map<String, int> _remaining = {};
   final Map<String, Timer> _timers = {};
+  final Map<String, DateTime> _endsAt = {};
+  final Map<String, String> _timerTexts = {};
+  final Set<String> _completedTimerKeys = {};
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _reconcileTimers();
+  }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     for (final t in _timers.values) {
       t.cancel();
     }
@@ -54,6 +71,7 @@ class _RecipeCookScreenState extends State<RecipeCookScreen> {
   void _initSelection(Recipe recipe) {
     if (_initialized) return;
     _selected = recipe.defaultSelection;
+    _servings = recipe.servings ?? 1;
     _initialized = true;
   }
 
@@ -63,35 +81,95 @@ class _RecipeCookScreenState extends State<RecipeCookScreen> {
 
   void _startTimer(String key, int seconds, String stepText) {
     _timers[key]?.cancel();
+    final endsAt = DateTime.now().add(Duration(seconds: seconds));
+    _endsAt[key] = endsAt;
+    _timerTexts[key] = stepText;
+    _completedTimerKeys.remove(key);
     setState(() => _remaining[key] = seconds);
+    unawaited(
+      NotificationService.instance.scheduleCookingTimer(
+        timerKey: key,
+        stepText: stepText,
+        endsAt: endsAt,
+      ),
+    );
     _timers[key] = Timer.periodic(const Duration(seconds: 1), (timer) {
-      final left = (_remaining[key] ?? 0) - 1;
+      final end = _endsAt[key];
+      final left = end == null ? 0 : end.difference(DateTime.now()).inSeconds;
       if (left <= 0) {
         timer.cancel();
         _timers.remove(key);
-        if (mounted) setState(() => _remaining.remove(key));
-        NotificationService.instance.showTimerComplete(stepText);
-        HapticFeedback.vibrate();
-        if (mounted) {
-          ScaffoldMessenger.of(context)
-            ..hideCurrentSnackBar()
-            ..showSnackBar(
-              SnackBar(
-                behavior: SnackBarBehavior.floating,
-                content: Text('Timer done: $stepText'),
-              ),
-            );
-        }
-      } else {
-        if (mounted) setState(() => _remaining[key] = left);
+        _finishTimer(key, stepText, showNotification: true);
+      } else if (mounted) {
+        setState(() => _remaining[key] = left);
       }
     });
+  }
+
+  void _finishTimer(
+    String key,
+    String stepText, {
+    required bool showNotification,
+  }) {
+    _endsAt.remove(key);
+    _timerTexts.remove(key);
+    if (mounted) setState(() => _remaining.remove(key));
+    if (!_completedTimerKeys.add(key)) return;
+    if (showNotification) {
+      unawaited(NotificationService.instance.showTimerComplete(stepText));
+    }
+    HapticFeedback.vibrate();
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text('Timer done: $stepText'),
+          ),
+        );
+    }
+  }
+
+  void _reconcileTimers() {
+    final now = DateTime.now();
+    for (final entry in _endsAt.entries.toList()) {
+      final left = entry.value.difference(now).inSeconds;
+      final key = entry.key;
+      final text = _timerTexts[key] ?? 'Cooking step';
+      if (left <= 0) {
+        _timers[key]?.cancel();
+        _timers.remove(key);
+        _finishTimer(key, text, showNotification: false);
+      } else {
+        if (mounted) setState(() => _remaining[key] = left);
+        if (!_timers.containsKey(key)) {
+          _timers[key] = Timer.periodic(const Duration(seconds: 1), (timer) {
+            final end = _endsAt[key];
+            final remaining = end == null
+                ? 0
+                : end.difference(DateTime.now()).inSeconds;
+            if (remaining <= 0) {
+              timer.cancel();
+              _timers.remove(key);
+              _finishTimer(key, text, showNotification: false);
+            } else if (mounted) {
+              setState(() => _remaining[key] = remaining);
+            }
+          });
+        }
+      }
+    }
   }
 
   void _cancelTimer(String key) {
     _timers[key]?.cancel();
     _timers.remove(key);
-    setState(() => _remaining.remove(key));
+    _endsAt.remove(key);
+    _timerTexts.remove(key);
+    _completedTimerKeys.remove(key);
+    unawaited(NotificationService.instance.cancelCookingTimer(key));
+    if (mounted) setState(() => _remaining.remove(key));
   }
 
   void _toggleStep(CookStep step) {
@@ -144,8 +222,17 @@ class _RecipeCookScreenState extends State<RecipeCookScreen> {
       );
   }
 
-  /// Whether any selected ingredient is missing from inventory (no match or
-  /// needs purchase) — drives the shopping-list button's enabled state.
+  Future<void> _recordCooked(Recipe recipe) async {
+    final provider = context.read<RecipeProvider>();
+    final who = context.read<AuthProvider>().resolvedDisplayName;
+    await provider.recordCooked(recipe, cookedBy: who);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Cooking session saved to history.')),
+    );
+  }
+
+  /// Whether any selected ingredient is missing from inventory.
   bool _hasMissing(BuildContext context, Recipe recipe) {
     final grocery = context.read<GroceryProvider>();
     for (final ing in recipe.ingredients) {
@@ -189,6 +276,13 @@ class _RecipeCookScreenState extends State<RecipeCookScreen> {
               ),
 
               SliverToBoxAdapter(
+                child: _ServingsControl(
+                  servings: _servings,
+                  onChanged: (value) => setState(() => _servings = value),
+                ),
+              ),
+
+              SliverToBoxAdapter(
                 child: _SectionHeader(
                   icon: Icons.checklist_rounded,
                   title: 'Ingredients',
@@ -211,6 +305,13 @@ class _RecipeCookScreenState extends State<RecipeCookScreen> {
                       .findInventoryMatch(ing.name);
                   return _IngredientRow(
                     ingredient: ing,
+                    quantityLabel: [
+                      scaledQuantityLabel(
+                        ing.quantity,
+                        _servings / (recipe.servings ?? 1),
+                      ),
+                      ing.unit ?? '',
+                    ].where((part) => part.isNotEmpty).join(' '),
                     isSelected: _selected.contains(ing.id),
                     match: match,
                     onToggle: () =>
@@ -274,6 +375,17 @@ class _RecipeCookScreenState extends State<RecipeCookScreen> {
                       onCancelTimer: () => _cancelTimer(key),
                     );
                   },
+                ),
+              if (steps.isNotEmpty && doneCount == steps.length)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                    child: FilledButton.icon(
+                      onPressed: () => _recordCooked(recipe),
+                      icon: const Icon(Icons.history),
+                      label: const Text('Finish and save to history'),
+                    ),
+                  ),
                 ),
 
               const SliverToBoxAdapter(child: SizedBox(height: 40)),
@@ -510,6 +622,52 @@ class _HeroHeader extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
+// Servings control
+// ---------------------------------------------------------------------------
+
+class _ServingsControl extends StatelessWidget {
+  const _ServingsControl({required this.servings, required this.onChanged});
+
+  final int servings;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+      child: Row(
+        children: [
+          Icon(Icons.people_alt_outlined, size: 18, color: scheme.primary),
+          const SizedBox(width: 8),
+          Text(
+            'Servings',
+            style: Theme.of(context).textTheme.titleSmall
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const Spacer(),
+          IconButton(
+            tooltip: 'Decrease servings',
+            onPressed: servings > 1 ? () => onChanged(servings - 1) : null,
+            icon: const Icon(Icons.remove_circle_outline),
+          ),
+          Text(
+            '$servings',
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          IconButton(
+            tooltip: 'Increase servings',
+            onPressed: servings < 50 ? () => onChanged(servings + 1) : null,
+            icon: const Icon(Icons.add_circle_outline),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Progress banner
 // ---------------------------------------------------------------------------
 
@@ -670,6 +828,7 @@ class _IngredientRow extends StatelessWidget {
     required this.ingredient,
     required this.isSelected,
     required this.match,
+    required this.quantityLabel,
     required this.onToggle,
     this.onOpenInventory,
   });
@@ -677,6 +836,7 @@ class _IngredientRow extends StatelessWidget {
   final RecipeIngredient ingredient;
   final bool isSelected;
   final GroceryItem? match;
+  final String quantityLabel;
   final VoidCallback onToggle;
   final VoidCallback? onOpenInventory;
 
@@ -685,7 +845,7 @@ class _IngredientRow extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final ing = ingredient;
-    final qtyStr = ing.amountLabel;
+    final qtyStr = quantityLabel;
 
     return Semantics(
       label:

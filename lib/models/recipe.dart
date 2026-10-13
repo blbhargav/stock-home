@@ -62,6 +62,39 @@ class RecipeIngredient {
   }
 }
 
+/// Scales a free-text ingredient quantity for a serving multiplier. Supports
+/// integers, decimals, simple fractions, and common Unicode fractions.
+String scaledQuantityLabel(String? quantity, double multiplier) {
+  final raw = quantity?.trim() ?? '';
+  if (raw.isEmpty || multiplier == 1) return raw;
+  final value = _parseQuantity(raw);
+  if (value == null) return raw;
+  final scaled = value * multiplier;
+  if ((scaled - scaled.round()).abs() < 0.001) return scaled.round().toString();
+  var text = scaled.toStringAsFixed(2);
+  while (text.endsWith('0')) {
+    text = text.substring(0, text.length - 1);
+  }
+  if (text.endsWith('.')) text = text.substring(0, text.length - 1);
+  return text;
+}
+
+double? _parseQuantity(String raw) {
+  const unicode = {'½': 0.5, '¼': 0.25, '¾': 0.75, '⅓': 1 / 3, '⅔': 2 / 3};
+  if (unicode.containsKey(raw)) return unicode[raw];
+  if (raw.contains('/')) {
+    final parts = raw.split('/');
+    if (parts.length == 2) {
+      final numerator = double.tryParse(parts[0].trim());
+      final denominator = double.tryParse(parts[1].trim());
+      if (numerator != null && denominator != null && denominator != 0) {
+        return numerator / denominator;
+      }
+    }
+  }
+  return double.tryParse(raw);
+}
+
 /// A single cooking instruction. A step is only shown when every ingredient id
 /// in [requiresIngredients] has been selected by the user. Steps with no
 /// requirements always show.
@@ -101,6 +134,9 @@ class Recipe {
     this.isBuiltIn = false,
     this.createdBy,
     this.imageUrl,
+    this.category = 'Other',
+    this.tags = const [],
+    this.updatedAt,
   });
 
   final String id;
@@ -110,16 +146,19 @@ class Recipe {
   final List<RecipeIngredient> ingredients;
   final List<RecipeStep> steps;
 
-  /// True for curated recipes bundled with the app (not editable/deletable).
   final bool isBuiltIn;
-
-  /// Display name of the household member who created a user recipe.
   final String? createdBy;
-
-  /// Optional hero image (Firebase Storage download URL) for user recipes.
   final String? imageUrl;
 
-  /// Ingredient ids that are selected by default (all required ones).
+  /// Broad grouping used by recipe list filters.
+  final String category;
+
+  /// Searchable labels, such as "breakfast" or "quick".
+  final List<String> tags;
+
+  /// Server timestamp used to detect concurrent edits.
+  final DateTime? updatedAt;
+
   Set<String> get defaultSelection =>
       ingredients.where((i) => !i.optional).map((i) => i.id).toSet();
 
@@ -133,6 +172,9 @@ class Recipe {
     bool? isBuiltIn,
     String? createdBy,
     String? imageUrl,
+    String? category,
+    List<String>? tags,
+    DateTime? updatedAt,
   }) {
     return Recipe(
       id: id ?? this.id,
@@ -144,6 +186,9 @@ class Recipe {
       isBuiltIn: isBuiltIn ?? this.isBuiltIn,
       createdBy: createdBy ?? this.createdBy,
       imageUrl: imageUrl ?? this.imageUrl,
+      category: category ?? this.category,
+      tags: tags ?? this.tags,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }

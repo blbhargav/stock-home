@@ -9,6 +9,7 @@ class SettingsService {
   static const _kThemeMode = 'theme_mode'; // 0=system,1=light,2=dark
   static const _kShoppingSortIndex = 'shopping_sort_index';
   static const _kLanguageCode = 'language_code';
+  static const _kFavoriteRecipeIds = 'favorite_recipe_ids';
 
   Future<bool> getExpiryRemindersEnabled() async {
     final prefs = await SharedPreferences.getInstance();
@@ -83,5 +84,15 @@ class SettingsService {
     } else {
       await prefs.setString(_kLanguageCode, code);
     }
+  }
+
+  Future<Set<String>> getFavoriteRecipeIds() async {
+    final prefs = await SharedPreferences.getInstance();
+    return (prefs.getStringList(_kFavoriteRecipeIds) ?? const []).toSet();
+  }
+
+  Future<void> setFavoriteRecipeIds(Set<String> ids) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_kFavoriteRecipeIds, ids.toList());
   }
 }

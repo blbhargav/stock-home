@@ -184,6 +184,9 @@ class NotificationService {
   static const _timerChannelId = 'cook_timers';
   static const int _timerNotificationId = 778001;
 
+  int _cookingTimerId(String key) =>
+      (key.hashCode ^ 0x3a6f19c1) & 0x7fffffff;
+
   NotificationDetails get _timerDetails => const NotificationDetails(
     android: AndroidNotificationDetails(
       _timerChannelId,
@@ -197,6 +200,37 @@ class NotificationService {
     iOS: DarwinNotificationDetails(),
     macOS: DarwinNotificationDetails(),
   );
+
+  /// Schedules a timer notification up front so it still fires if the app is
+  /// backgrounded or the screen is no longer active.
+  Future<void> scheduleCookingTimer({
+    required String timerKey,
+    required String stepText,
+    required DateTime endsAt,
+  }) async {
+    await init();
+    final id = _cookingTimerId(timerKey);
+    await _plugin.cancel(id: id);
+    final when = tz.TZDateTime.from(endsAt, tz.local);
+    if (!when.isAfter(tz.TZDateTime.now(tz.local))) return;
+    try {
+      await _plugin.zonedSchedule(
+        id: id,
+        title: 'Cooking timer done',
+        body: stepText,
+        scheduledDate: when,
+        notificationDetails: _timerDetails,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      );
+    } catch (e) {
+      debugPrint('Failed to schedule cooking timer: $e');
+    }
+  }
+
+  Future<void> cancelCookingTimer(String timerKey) async {
+    await init();
+    await _plugin.cancel(id: _cookingTimerId(timerKey));
+  }
 
   /// Shows an immediate notification when a step's cooking timer finishes.
   Future<void> showTimerComplete(String stepText) async {

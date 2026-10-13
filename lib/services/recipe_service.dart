@@ -1,6 +1,15 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/recipe.dart';
+import '../models/recipe_history.dart';
+
+class RecipeConflictException implements Exception {
+  const RecipeConflictException();
+
+  @override
+  String toString() =>
+      'This recipe was changed by another household member. Reload it before saving.';
+}
 
 /// Firestore CRUD + streaming for household-shared user recipes.
 ///
@@ -24,16 +33,80 @@ class RecipeService {
   }
 
   Future<String> addRecipe(String householdId, Recipe recipe) async {
-    final ref = await _recipes(householdId).add(_toMap(recipe));
+    final ref = await _recipes(householdId).add({
+      ..._toMap(recipe),
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
     return ref.id;
   }
 
-  Future<void> updateRecipe(String householdId, Recipe recipe) {
-    return _recipes(householdId).doc(recipe.id).update(_toMap(recipe));
+  /// Updates only if the server version still matches the version loaded by
+  /// the editor. Prevents silent last-write-wins data loss.
+  Future<void> updateRecipe(String householdId, Recipe recipe) async {
+    final ref = _recipes(householdId).doc(recipe.id);
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) throw StateError('Recipe no longer exists.');
+      final data = snap.data() ?? const <String, dynamic>{};
+      final serverUpdated = _dateFrom(data['updatedAt']);
+      final expected = recipe.updatedAt;
+      if (expected != null &&
+          (serverUpdated == null ||
+              serverUpdated.millisecondsSinceEpoch !=
+                  expected.millisecondsSinceEpoch)) {
+        throw const RecipeConflictException();
+      }
+      tx.update(ref, {
+        ..._toMap(recipe),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
   }
 
   Future<void> deleteRecipe(String householdId, String recipeId) {
     return _recipes(householdId).doc(recipeId).delete();
+  }
+
+  Stream<List<RecipeHistoryEntry>> watchHistory(String householdId) {
+    return _db
+        .collection('households')
+        .doc(householdId)
+        .collection('recipeHistory')
+        .orderBy('cookedAt', descending: true)
+        .limit(20)
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map((doc) {
+                final data = doc.data();
+                return RecipeHistoryEntry(
+                  id: doc.id,
+                  recipeId: (data['recipeId'] ?? '') as String,
+                  recipeName: (data['recipeName'] ?? 'Recipe') as String,
+                  cookedAt: _dateFrom(data['cookedAt']) ?? DateTime.now(),
+                  cookedBy: data['cookedBy'] as String?,
+                );
+              })
+              .toList(growable: false),
+        );
+  }
+
+  Future<void> recordCooked({
+    required String householdId,
+    required Recipe recipe,
+    String? cookedBy,
+  }) {
+    return _db
+        .collection('households')
+        .doc(householdId)
+        .collection('recipeHistory')
+        .add({
+          'recipeId': recipe.id,
+          'recipeName': recipe.name,
+          'cookedBy': cookedBy,
+          'cookedAt': FieldValue.serverTimestamp(),
+        });
   }
 
   // --- Serialization ---
@@ -44,6 +117,12 @@ class RecipeService {
   }
 
   static Map<String, dynamic> _toMap(Recipe r) => recipeToMap(r);
+
+  static DateTime? _dateFrom(Object? value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    return null;
+  }
 }
 
 /// Pure map -> Recipe conversion (testable without Firestore).
@@ -91,7 +170,16 @@ Recipe recipeFromMap(String id, Map<String, dynamic> data) {
     isBuiltIn: false,
     createdBy: data['createdBy'] as String?,
     imageUrl: data['imageUrl'] as String?,
+    category: (data['category'] ?? 'Other') as String,
+    tags: ((data['tags'] as List?) ?? const []).whereType<String>().toList(),
+    updatedAt: recipeDateFrom(data['updatedAt']),
   );
+}
+
+DateTime? recipeDateFrom(Object? value) {
+  if (value is Timestamp) return value.toDate();
+  if (value is DateTime) return value;
+  return null;
 }
 
 /// Pure Recipe -> map conversion (testable without Firestore).
@@ -102,6 +190,8 @@ Map<String, dynamic> recipeToMap(Recipe r) {
     'servings': r.servings,
     'createdBy': r.createdBy,
     'imageUrl': r.imageUrl,
+    'category': r.category,
+    'tags': r.tags,
     'ingredients': r.ingredients
         .map(
           (i) => {

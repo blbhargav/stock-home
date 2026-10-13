@@ -101,15 +101,31 @@ void main() {
     });
   });
 
+  group('servings scaling', () {
+    test('scales numeric, fraction, and unicode quantities', () {
+      expect(scaledQuantityLabel('2', 2), '4');
+      expect(scaledQuantityLabel('1/2', 2), '1');
+      expect(scaledQuantityLabel('½', 3), '1.5');
+      expect(scaledQuantityLabel('to taste', 2), 'to taste');
+      expect(scaledQuantityLabel('', 2), '');
+    });
+  });
+
   group('recipe serialization round-trip', () {
     test('toMap -> fromMap preserves fields', () {
-      final original = _sample().copyWith(createdBy: 'Bhargav');
+      final original = _sample().copyWith(
+        createdBy: 'Bhargav',
+        category: 'Breakfast',
+        tags: ['quick', 'egg'],
+      );
       final map = recipeToMap(original);
       final restored = recipeFromMap('r1', map);
 
       expect(restored.name, original.name);
       expect(restored.servings, original.servings);
       expect(restored.createdBy, 'Bhargav');
+      expect(restored.category, 'Breakfast');
+      expect(restored.tags, ['quick', 'egg']);
       expect(restored.ingredients.length, original.ingredients.length);
       expect(restored.ingredients[1].prep, 'finely chopped');
       expect(restored.ingredients[2].optional, isTrue);

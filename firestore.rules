@@ -53,6 +53,10 @@ service cloud.firestore {
       match /recipes/{recipeId} {
         allow read, write: if isMember(householdId);
       }
+
+      match /recipeHistory/{historyId} {
+        allow read, write: if isMember(householdId);
+      }
     }
 
     function household(householdId) {
