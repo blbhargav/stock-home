@@ -173,6 +173,7 @@ Recipe recipeFromMap(String id, Map<String, dynamic> data) {
     category: (data['category'] ?? 'Other') as String,
     tags: ((data['tags'] as List?) ?? const []).whereType<String>().toList(),
     updatedAt: recipeDateFrom(data['updatedAt']),
+    isDraft: (data['isDraft'] as bool?) ?? false,
   );
 }
 
@@ -192,6 +193,7 @@ Map<String, dynamic> recipeToMap(Recipe r) {
     'imageUrl': r.imageUrl,
     'category': r.category,
     'tags': r.tags,
+    'isDraft': r.isDraft,
     'ingredients': r.ingredients
         .map(
           (i) => {

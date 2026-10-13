@@ -181,12 +181,12 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => removed.dispose());
   }
 
-  Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _save({required bool asDraft}) async {
+    if (!asDraft && !_formKey.currentState!.validate()) return;
     final valid = _ingredients
         .where((i) => i.nameCtrl.text.trim().isNotEmpty)
         .toList();
-    if (valid.isEmpty) {
+    if (!asDraft && valid.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Add at least one ingredient.')),
       );
@@ -241,7 +241,9 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
 
     final recipe = Recipe(
       id: widget.existing?.id ?? 'temp',
-      name: _nameCtrl.text.trim(),
+      name: _nameCtrl.text.trim().isEmpty
+          ? 'Untitled recipe'
+          : _nameCtrl.text.trim(),
       description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
       servings: int.tryParse(_servingsCtrl.text.trim()),
       ingredients: ingredients,
@@ -254,6 +256,7 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
           : _categoryCtrl.text.trim(),
       tags: tags,
       updatedAt: widget.existing?.updatedAt,
+      isDraft: asDraft,
     );
 
     try {
@@ -367,6 +370,11 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
               icon: const Icon(Icons.delete_outline),
               onPressed: _saving ? null : _confirmDelete,
             ),
+          if (!_saving)
+            TextButton(
+              onPressed: () => _save(asDraft: true),
+              child: const Text('Save draft'),
+            ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: _saving
@@ -382,7 +390,7 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
                     ),
                   )
                 : FilledButton(
-                    onPressed: _save,
+                    onPressed: () => _save(asDraft: false),
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 18),
                       minimumSize: const Size(0, 36),
@@ -394,7 +402,9 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
                         fontSize: 14,
                       ),
                     ),
-                    child: Text(widget.isEditing ? 'Update' : 'Save'),
+                    child: Text(
+                      widget.existing?.isDraft == true ? 'Publish' : 'Save',
+                    ),
                   ),
           ),
         ],
@@ -577,21 +587,42 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
             ),
 
             const SizedBox(height: 28),
-            FilledButton.tonal(
-              onPressed: _saving ? null : _save,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(52),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _saving ? null : () => _save(asDraft: true),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text('Save draft'),
+                  ),
                 ),
-              ),
-              child: Text(
-                widget.isEditing ? 'Update recipe' : 'Save recipe',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton.tonal(
+                    onPressed: _saving ? null : () => _save(asDraft: false),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Text(
+                      widget.existing?.isDraft == true
+                          ? 'Publish'
+                          : 'Save recipe',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ],
         ),

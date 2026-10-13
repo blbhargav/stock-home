@@ -137,6 +137,7 @@ class Recipe {
     this.category = 'Other',
     this.tags = const [],
     this.updatedAt,
+    this.isDraft = false,
   });
 
   final String id;
@@ -159,6 +160,9 @@ class Recipe {
   /// Server timestamp used to detect concurrent edits.
   final DateTime? updatedAt;
 
+  /// Drafts are editable but not ready to cook/publish.
+  final bool isDraft;
+
   Set<String> get defaultSelection =>
       ingredients.where((i) => !i.optional).map((i) => i.id).toSet();
 
@@ -175,6 +179,7 @@ class Recipe {
     String? category,
     List<String>? tags,
     DateTime? updatedAt,
+    bool? isDraft,
   }) {
     return Recipe(
       id: id ?? this.id,
@@ -189,6 +194,7 @@ class Recipe {
       category: category ?? this.category,
       tags: tags ?? this.tags,
       updatedAt: updatedAt ?? this.updatedAt,
+      isDraft: isDraft ?? this.isDraft,
     );
   }
 }

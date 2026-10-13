@@ -209,9 +209,10 @@ class _RecipeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final provider = context.watch<RecipeProvider>();
     final optionalCount = recipe.ingredients.where((i) => i.optional).length;
     final subtitleParts = <String>[
-      recipe.category,
+      recipe.isDraft ? 'Draft' : recipe.category,
       '${recipe.ingredients.length} ingredients',
       if (recipe.servings != null) 'serves ${recipe.servings}',
       if (optionalCount > 0) '$optionalCount optional',
@@ -234,28 +235,48 @@ class _RecipeCard extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              tooltip: context.read<RecipeProvider>().isFavorite(recipe.id)
+              tooltip: provider.isFavorite(recipe.id)
                   ? 'Remove favorite'
                   : 'Favorite',
               icon: Icon(
-                context.watch<RecipeProvider>().isFavorite(recipe.id)
+                provider.isFavorite(recipe.id)
                     ? Icons.favorite
                     : Icons.favorite_border,
-                color: context.watch<RecipeProvider>().isFavorite(recipe.id)
+                color: provider.isFavorite(recipe.id)
                     ? scheme.error
                     : scheme.onSurfaceVariant,
               ),
-              onPressed: () =>
-                  context.read<RecipeProvider>().toggleFavorite(recipe.id),
+              onPressed: () => provider.toggleFavorite(recipe.id),
             ),
-            const Icon(Icons.chevron_right),
+            if (!recipe.isBuiltIn)
+              IconButton(
+                tooltip: 'Edit recipe',
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => RecipeEditScreen(existing: recipe),
+                  ),
+                ),
+              )
+            else
+              const Icon(Icons.chevron_right),
           ],
         ),
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => RecipeCookScreen(recipeId: recipe.id),
-          ),
-        ),
+        onTap: () {
+          if (recipe.isDraft) {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => RecipeEditScreen(existing: recipe),
+              ),
+            );
+          } else {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => RecipeCookScreen(recipeId: recipe.id),
+              ),
+            );
+          }
+        },
       ),
     );
   }

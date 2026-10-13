@@ -113,6 +113,7 @@ class RecipeProvider extends ChangeNotifier {
       createdBy: createdBy,
       category: source.category,
       tags: source.tags,
+      isDraft: false,
     );
     return _service.addRecipe(id, copy);
   }
