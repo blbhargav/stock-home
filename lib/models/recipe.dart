@@ -100,6 +100,7 @@ class Recipe {
     this.steps = const [],
     this.isBuiltIn = false,
     this.createdBy,
+    this.imageUrl,
   });
 
   final String id;
@@ -115,6 +116,9 @@ class Recipe {
   /// Display name of the household member who created a user recipe.
   final String? createdBy;
 
+  /// Optional hero image (Firebase Storage download URL) for user recipes.
+  final String? imageUrl;
+
   /// Ingredient ids that are selected by default (all required ones).
   Set<String> get defaultSelection =>
       ingredients.where((i) => !i.optional).map((i) => i.id).toSet();
@@ -128,6 +132,7 @@ class Recipe {
     List<RecipeStep>? steps,
     bool? isBuiltIn,
     String? createdBy,
+    String? imageUrl,
   }) {
     return Recipe(
       id: id ?? this.id,
@@ -138,6 +143,7 @@ class Recipe {
       steps: steps ?? this.steps,
       isBuiltIn: isBuiltIn ?? this.isBuiltIn,
       createdBy: createdBy ?? this.createdBy,
+      imageUrl: imageUrl ?? this.imageUrl,
     );
   }
 }

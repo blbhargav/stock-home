@@ -12,25 +12,27 @@ class StorageService {
 
   final FirebaseStorage _storage;
 
-  Reference _imageRef(String householdId, String imageId) {
+  Reference _imageRef(String householdId, String imageId, String folder) {
     return _storage
         .ref()
         .child('households')
         .child(householdId)
-        .child('groceries')
+        .child(folder)
         .child('$imageId.jpg');
   }
 
   /// Uploads [file] for the household and returns its download URL.
   /// [imageId] uniquely identifies the image (e.g. a timestamp or item id).
+  /// [folder] groups images (e.g. 'groceries' or 'recipes').
   /// [onProgress] reports 0.0–1.0 upload progress.
   Future<String> uploadImage({
     required String householdId,
     required String imageId,
     required File file,
+    String folder = 'groceries',
     void Function(double progress)? onProgress,
   }) async {
-    final ref = _imageRef(householdId, imageId);
+    final ref = _imageRef(householdId, imageId, folder);
     final task = ref.putFile(file, SettableMetadata(contentType: 'image/jpeg'));
 
     StreamSubscription<TaskSnapshot>? progressSub;

@@ -90,6 +90,7 @@ Recipe recipeFromMap(String id, Map<String, dynamic> data) {
     steps: steps,
     isBuiltIn: false,
     createdBy: data['createdBy'] as String?,
+    imageUrl: data['imageUrl'] as String?,
   );
 }
 
@@ -100,6 +101,7 @@ Map<String, dynamic> recipeToMap(Recipe r) {
     'description': r.description?.trim(),
     'servings': r.servings,
     'createdBy': r.createdBy,
+    'imageUrl': r.imageUrl,
     'ingredients': r.ingredients
         .map(
           (i) => {

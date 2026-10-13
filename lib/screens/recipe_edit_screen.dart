@@ -1,10 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../models/recipe.dart';
 import '../providers/auth_provider.dart';
 import '../providers/recipe_provider.dart';
+import '../services/storage_service.dart';
 
 /// Create or edit a household (user) recipe. Built-in recipes are read-only and
 /// never reach this screen for editing.
@@ -34,6 +38,12 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
   int _nextIngredientId = 0;
   bool _saving = false;
 
+  final _imagePicker = ImagePicker();
+  final _storage = StorageService();
+  File? _pickedImage; // newly chosen image not yet uploaded
+  String? _imageUrl; // existing/remote image url
+  bool _removeImage = false;
+
   @override
   void initState() {
     super.initState();
@@ -41,6 +51,7 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
     _nameCtrl = TextEditingController(text: r?.name ?? '');
     _descCtrl = TextEditingController(text: r?.description ?? '');
     _servingsCtrl = TextEditingController(text: r?.servings?.toString() ?? '');
+    _imageUrl = r?.imageUrl;
 
     if (r != null) {
       for (final ing in r.ingredients) {
@@ -96,6 +107,66 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
     setState(() => _steps.add(_StepDraft()));
   }
 
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final picked = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 80,
+      );
+      if (picked == null) return;
+      setState(() {
+        _pickedImage = File(picked.path);
+        _removeImage = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Could not pick image.')));
+      }
+    }
+  }
+
+  void _showImageSourceSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Take a photo'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickImage(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from gallery'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickImage(ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _removeCurrentImage() {
+    setState(() {
+      _pickedImage = null;
+      _imageUrl = null;
+      _removeImage = true;
+    });
+  }
+
   void _removeStep(int index) {
     HapticFeedback.selectionClick();
     final removed = _steps[index];
@@ -118,7 +189,9 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
     FocusScope.of(context).unfocus();
     setState(() => _saving = true);
     final provider = context.read<RecipeProvider>();
-    final who = context.read<AuthProvider>().resolvedDisplayName;
+    final auth = context.read<AuthProvider>();
+    final who = auth.resolvedDisplayName;
+    final householdId = auth.householdId;
 
     final ingredients = valid.map((d) => d.toModel()).toList();
     final validIds = ingredients.map((i) => i.id).toSet();
@@ -126,6 +199,32 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
         .where((s) => s.textCtrl.text.trim().isNotEmpty)
         .map((s) => s.toModel(validIds))
         .toList();
+
+    // Resolve the hero image: upload a newly picked one, keep/clear existing.
+    String? imageUrl = _removeImage ? null : _imageUrl;
+    try {
+      if (_pickedImage != null && householdId != null) {
+        final imageId = 'recipe_${DateTime.now().microsecondsSinceEpoch}';
+        imageUrl = await _storage.uploadImage(
+          householdId: householdId,
+          imageId: imageId,
+          file: _pickedImage!,
+          folder: 'recipes',
+        );
+        // Delete the previous image if we're replacing one.
+        final old = widget.existing?.imageUrl;
+        if (old != null && old.isNotEmpty && old != imageUrl) {
+          await _storage.deleteByUrl(old);
+        }
+      } else if (_removeImage) {
+        final old = widget.existing?.imageUrl;
+        if (old != null && old.isNotEmpty) {
+          await _storage.deleteByUrl(old);
+        }
+      }
+    } catch (_) {
+      // Non-fatal: save the recipe without blocking on image issues.
+    }
 
     final recipe = Recipe(
       id: widget.existing?.id ?? 'temp',
@@ -136,6 +235,7 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
       steps: steps,
       isBuiltIn: false,
       createdBy: widget.existing?.createdBy ?? who,
+      imageUrl: imageUrl,
     );
 
     try {
@@ -286,6 +386,13 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
             const _SectionLabel(
               icon: Icons.restaurant_menu_rounded,
               label: 'Basic info',
+            ),
+            const SizedBox(height: 12),
+            _ImagePickerCard(
+              pickedImage: _pickedImage,
+              imageUrl: _removeImage ? null : _imageUrl,
+              onPick: _showImageSourceSheet,
+              onRemove: _removeCurrentImage,
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -988,6 +1095,87 @@ class _CardHeader extends StatelessWidget {
               visualDensity: VisualDensity.compact,
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// A tappable card for choosing a recipe hero image. Shows a preview (local
+/// file or remote url) with a remove button, or an "add photo" placeholder.
+class _ImagePickerCard extends StatelessWidget {
+  const _ImagePickerCard({
+    required this.pickedImage,
+    required this.imageUrl,
+    required this.onPick,
+    required this.onRemove,
+  });
+
+  final File? pickedImage;
+  final String? imageUrl;
+  final VoidCallback onPick;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final hasImage =
+        pickedImage != null || (imageUrl != null && imageUrl!.isNotEmpty);
+
+    return GestureDetector(
+      onTap: onPick,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          height: 160,
+          width: double.infinity,
+          color: scheme.surfaceContainerHighest,
+          child: hasImage
+              ? Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (pickedImage != null)
+                      Image.file(pickedImage!, fit: BoxFit.cover)
+                    else
+                      Image.network(
+                        imageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) =>
+                            const Center(child: Icon(Icons.broken_image)),
+                      ),
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Material(
+                        color: scheme.surface.withValues(alpha: 0.85),
+                        shape: const CircleBorder(),
+                        child: IconButton(
+                          tooltip: 'Remove photo',
+                          icon: const Icon(Icons.close, size: 18),
+                          onPressed: onRemove,
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.add_a_photo_outlined,
+                      size: 32,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Add a photo (optional)',
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+        ),
       ),
     );
   }

@@ -44,6 +44,7 @@ class RecipeProvider extends ChangeNotifier {
     _userRecipes = [];
 
     if (householdId == null) {
+      _loading = false;
       notifyListeners();
       return;
     }
@@ -62,6 +63,25 @@ class RecipeProvider extends ChangeNotifier {
     final id = _householdId;
     if (id == null) return null;
     return _service.addRecipe(id, recipe);
+  }
+
+  /// Saves an editable household copy of any recipe (built-in or user). The
+  /// copy drops the image (not re-uploaded) and marks the creator.
+  Future<String?> duplicateRecipe(Recipe source, {String? createdBy}) async {
+    final id = _householdId;
+    if (id == null) return null;
+    // Build explicitly so imageUrl is cleared (copyWith can't set null).
+    final copy = Recipe(
+      id: 'temp',
+      name: '${source.name} (copy)',
+      description: source.description,
+      servings: source.servings,
+      ingredients: source.ingredients,
+      steps: source.steps,
+      isBuiltIn: false,
+      createdBy: createdBy,
+    );
+    return _service.addRecipe(id, copy);
   }
 
   Future<void> updateRecipe(Recipe recipe) async {

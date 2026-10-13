@@ -319,9 +319,41 @@ class _RecipeCookScreenState extends State<RecipeCookScreen> {
               ),
             ),
           ),
+        if (recipe.isBuiltIn)
+          IconButton(
+            tooltip: 'Save an editable copy',
+            icon: circle(Icons.copy_all_outlined),
+            onPressed: () => _saveCopy(context, recipe),
+          ),
         const SizedBox(width: 8),
       ],
     );
+  }
+
+  Future<void> _saveCopy(BuildContext context, Recipe recipe) async {
+    final provider = context.read<RecipeProvider>();
+    final who = context.read<AuthProvider>().resolvedDisplayName;
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final newId = await provider.duplicateRecipe(recipe, createdBy: who);
+    if (newId == null) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Could not save a copy.')),
+      );
+      return;
+    }
+    // Replace this read-only built-in view with the editable copy.
+    navigator.pushReplacement(
+      MaterialPageRoute(builder: (_) => RecipeCookScreen(recipeId: newId)),
+    );
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text('Saved an editable copy to your recipes'),
+        ),
+      );
   }
 }
 
@@ -339,105 +371,138 @@ class _HeroHeader extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
+    final hasImage = recipe.imageUrl != null && recipe.imageUrl!.isNotEmpty;
+
     return SliverToBoxAdapter(
       child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              scheme.primaryContainer,
-              scheme.secondaryContainer.withValues(alpha: 0.6),
-              scheme.surface,
-            ],
-            stops: const [0.0, 0.55, 1.0],
-          ),
-        ),
-        child: SafeArea(
-          bottom: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 64, 20, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
+        decoration: hasImage
+            ? null
+            : BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    scheme.primaryContainer,
+                    scheme.secondaryContainer.withValues(alpha: 0.6),
+                    scheme.surface,
+                  ],
+                  stops: const [0.0, 0.55, 1.0],
+                ),
+              ),
+        child: Stack(
+          children: [
+            if (hasImage) ...[
+              Positioned.fill(
+                child: Image.network(
+                  recipe.imageUrl!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                ),
+              ),
+              Positioned.fill(
+                child: Container(
                   decoration: BoxDecoration(
-                    color: scheme.primary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(99),
-                    border: Border.all(
-                      color: scheme.primary.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Text(
-                    recipe.isBuiltIn ? 'Built-in recipe' : 'My recipe',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.5,
-                      color: scheme.primary,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  recipe.name,
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: scheme.onSurface,
-                    letterSpacing: -0.5,
-                    height: 1.15,
-                  ),
-                ),
-                if (recipe.description != null &&
-                    recipe.description!.trim().isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    recipe.description!,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                      height: 1.5,
-                    ),
-                  ),
-                ],
-                if (recipe.servings != null) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 7,
-                    ),
-                    decoration: BoxDecoration(
-                      color: scheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.people_alt_outlined,
-                          size: 16,
-                          color: scheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${recipe.servings} serving${recipe.servings! > 1 ? 's' : ''}',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.25),
+                        Colors.black.withValues(alpha: 0.7),
                       ],
                     ),
                   ),
-                ],
-              ],
+                ),
+              ),
+            ],
+            SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 64, 20, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: scheme.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(99),
+                        border: Border.all(
+                          color: scheme.primary.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Text(
+                        recipe.isBuiltIn ? 'Built-in recipe' : 'My recipe',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
+                          color: scheme.primary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      recipe.name,
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: hasImage ? Colors.white : scheme.onSurface,
+                        letterSpacing: -0.5,
+                        height: 1.15,
+                      ),
+                    ),
+                    if (recipe.description != null &&
+                        recipe.description!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        recipe.description!,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: hasImage
+                              ? Colors.white.withValues(alpha: 0.9)
+                              : scheme.onSurfaceVariant,
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                    if (recipe.servings != null) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: scheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.people_alt_outlined,
+                              size: 16,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '${recipe.servings} serving${recipe.servings! > 1 ? 's' : ''}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
