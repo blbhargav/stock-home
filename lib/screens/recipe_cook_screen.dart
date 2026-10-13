@@ -992,12 +992,17 @@ class _PrepHint extends StatelessWidget {
           color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
         ),
         const SizedBox(width: 3),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 11,
-            color: scheme.onSurfaceVariant.withValues(alpha: 0.75),
-            fontStyle: FontStyle.italic,
+        Flexible(
+          child: Text(
+            text,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            softWrap: true,
+            style: TextStyle(
+              fontSize: 11,
+              color: scheme.onSurfaceVariant.withValues(alpha: 0.75),
+              fontStyle: FontStyle.italic,
+            ),
           ),
         ),
       ],
