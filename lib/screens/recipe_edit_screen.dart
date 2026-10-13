@@ -982,6 +982,27 @@ class _StepCard extends StatelessWidget {
   final VoidCallback onChanged;
   final VoidCallback? onRemove;
 
+  void _insertIngredient(String name) {
+    final controller = draft.textCtrl;
+    final value = controller.value;
+    final selection = value.selection;
+    final hasSelection = selection.isValid && selection.start >= 0;
+    final start = hasSelection ? selection.start : value.text.length;
+    final end = hasSelection ? selection.end : value.text.length;
+    final before = value.text.substring(0, start);
+    final after = value.text.substring(end);
+    final prefix = before.isNotEmpty && !before.endsWith(' ') ? ' ' : '';
+    final insertion = '$prefix$name';
+    final text = '$before$insertion$after';
+    controller.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(
+        offset: before.length + insertion.length,
+      ),
+    );
+    onChanged();
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -1022,6 +1043,30 @@ class _StepCard extends StatelessWidget {
                         ? 'Step text is required'
                         : null,
                   ),
+                  if (named.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Insert ingredient into this step:',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        for (final ing in named)
+                          ActionChip(
+                            avatar: const Icon(Icons.add, size: 15),
+                            label: Text(ing.nameCtrl.text.trim()),
+                            onPressed: () =>
+                                _insertIngredient(ing.nameCtrl.text.trim()),
+                          ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
